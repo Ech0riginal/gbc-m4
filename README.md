@@ -16,3 +16,9 @@ The Ultimate GameBoy Talk - https://www.youtube.com/watch?v=HyzD8pNlpwI
 
 GameBoy Programming Manual - https://archive.org/stream/GameBoyProgManVer1.1/GameBoyProgManVer1.1_djvu.txt
 
+ItsyBitsy M4:
+* ATSAMD51 32-bit Cortex M4 (at 120 MHz, DSP and FPU)
+* 512 KB flash, 192 KB RAM
+* 2 MB SPI FLASH chip for storing files and CircuitPython code storage.
+
+relevant documentation on the ATSAMD51G19A can be found in atsamd51g19/device_docs.pdf
