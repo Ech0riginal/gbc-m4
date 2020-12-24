@@ -1,0 +1,21 @@
+[package]
+name = "gbc-m4"
+version = "0.1.0"
+authors = ["Ech0riginal <samwatkins94@me.com>"]
+edition = "2018"
+
+[dependencies]
+itsybitsy_m4    = "0.4.0"
+atsamd-hal      = "0.11.0"
+panic-halt      = "0.2"
+
+[profile.dev]
+incremental = false
+codegen-units = 1
+debug = true
+lto = true
+
+[profile.release]
+debug = true
+lto = true
+opt-level = "s"
