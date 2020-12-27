@@ -127,10 +127,10 @@ impl CPU {
             Instruction::RRCA => {}
             Instruction::RRLA => {}
             Instruction::CPL => {}
-            Instruction::BIT(bit, register) => {
-                let r = self.getreg(register);
+            Instruction::BIT(bit, reg) => {
+                let r = self.getreg(reg);
                 // TODO flag factory; this's ridiculous, or is it? investigate once cpu's done
-                self.flag.zero((*r & 0x01) == 0);
+                self.flag.zero((*r >> bit & 0x01) == 0);
                 self.flag.subtract(false);
                 self.flag.half_carry(true);
             }
