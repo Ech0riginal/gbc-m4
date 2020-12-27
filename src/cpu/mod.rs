@@ -1,7 +1,6 @@
 // LR35902 ulator
 
 mod inner;
-mod registers;
 
 use inner::*;
 
