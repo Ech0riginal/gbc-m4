@@ -64,7 +64,8 @@ impl Instruction {
     }
 
     fn from_raw_instruction(byte: u8) -> Self {
-
+        unimplemented!()
+        /*  keep these around for reference
         match opcode {
             0x00 => Timing::Default,
             0x01 => Self::LD self.ld(BC, Imm16),
@@ -311,6 +312,7 @@ impl Instruction {
             0xfb => self.ei(),
             0xfe => self.cp(Imm8),
             0xff => self.rst(0x38),
+         */
     }
 
     fn from_prefixed_instruction(byte: u8) -> Self {

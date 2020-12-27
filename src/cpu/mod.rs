@@ -21,7 +21,7 @@ const VRAM_SIZE: usize = 0x7F;
 // https://github.com/nekronos/gbc_rs/blob/master/src/gbc/interconnect.rs
 
 #[repr(C)]
-struct CPU {
+pub(crate) struct CPU {
     /// Accumulator register
     a: u8,
     /// CPU flag register, see the flag_register module.
@@ -73,7 +73,7 @@ impl CPU {
             ram_offset: 0,
             bus: [0u8; BUS_SIZE],
             ram: [0u8; RAM_SIZE],
-            vram: [u8; VRAM_SIZE],
+            vram: [0u8; VRAM_SIZE],
         }
     }
 
@@ -101,84 +101,86 @@ impl CPU {
     /// the program counter before returning the value.
     fn d8(&mut self) -> u8 {
         let pc = self.pc;
-        unimplemented!()
+        unimplemented!("d8")
     }
 
     fn d16(&mut self) -> u16 {
-        unimplemented!()
+        unimplemented!("d16")
     }
 
     fn read(&mut self, addr: u16) -> u8 {
         match addr {
-            0x0000...0x7fff => unimplemented!(addr),
-            0x8000...0x9fff => unimplemented!(addr),
-            0xa000...0xbfff => unimplemented!(addr),
-            0xc000...0xcfff => unimplemented!(addr),
-            0xd000...0xdfff => unimplemented!(addr),
-            0xe000...0xfdff => self.read(addr - 0xe000 + 0xC000),
+            0x0000..=0x7fff => unimplemented!("{}", addr),
+            0x8000..=0x9fff => unimplemented!("{}", addr),
+            0xa000..=0xbfff => unimplemented!("{}", addr),
+            0xc000..=0xcfff => unimplemented!("{}", addr),
+            0xd000..=0xdfff => unimplemented!("{}", addr),
+            0xe000..=0xfdff => self.read(addr - 0xe000 + 0xC000),
 
-            0xff00 => unimplemented!(addr),
+            0xff00 => unimplemented!("{}", addr),
 
-            0xff01...0xff02 => {
+            0xff01..=0xff02 => {
                 // serial IO
-                unimplemented!(addr)
+                unimplemented!("{}", addr)
             }
-            0xff04...0xff07 => unimplemented!(addr),
+            0xff04..=0xff07 => unimplemented!("{}", addr),
 
-            0xff10...0xff3f => unimplemented!(addr),
+            0xff10..=0xff3f => unimplemented!("{}", addr),
 
-            0xff0f => unimplemented!(addr),
+            0xff0f => unimplemented!("{}", addr),
 
-            0xff46 => unimplemented!(addr),
+            0xff46 => unimplemented!("{}", addr),
 
-            0xfe00...0xfeff | 0xff40...0xff45 | 0xff47...0xff4b | 0xff68...0xff69 | 0xff4f => {
-                unimplemented!(addr)
+            0xfe00..=0xfeff | 0xff40..=0xff45 | 0xff47..=0xff4b | 0xff68..=0xff69 | 0xff4f => {
+                unimplemented!("{}", addr)
             }
 
             0xff4d => 0, // Speedswitch
-            0xff70 => unimplemented!(addr),
-            0xff80...0xfffe => self.vram[(addr - 0xFF80) as usize],
-            0xffff => unimplemented!(addr),
+            0xff70 => unimplemented!("{}", addr),
+            0xff80..=0xfffe => self.vram[(addr - 0xFF80) as usize],
+            0xffff => unimplemented!("{}", addr),
             _ => panic!("Read: addr not in range: 0x{:x}", addr),
         }
     }
 
+    #[allow(ellipsis_inclusive_range_patterns)]
     pub fn write(&mut self, addr: u16, val: u8) {
         match addr {
-            0x0000...0x7fff => unimplemented!(addr, val),
-            0x8000...0x9fff => unimplemented!(addr, val),
-            0xa000...0xbfff => unimplemented!(addr, val),
-            0xc000...0xcfff => self.ram[(addr - 0xC000) as usize] = val,
-            0xd000...0xdfff => self.ram[(addr - 0xC000) as usize + self.ram_offset] = val,
-            0xe000...0xfdff => self.write(addr - 0xE000 + 0xC000, val),
+            0x0000..=0x7fff => unimplemented!("{}", addr),
+            0x8000..=0x9fff => unimplemented!("{}", addr),
+            0xa000..=0xbfff => unimplemented!("{}", addr),
+            0xc000..=0xcfff => self.ram[(addr - 0xC000) as usize] = val,
+            0xd000..=0xdfff => self.ram[(addr - 0xC000) as usize + self.ram_offset] = val,
+            0xe000..=0xfdff => self.write(addr - 0xE000 + 0xC000, val),
 
-            0xff00 => unimplemented!(val),
+            0xff00 => unimplemented!("{} {}", addr, val),
 
-            0xff01...0xff02 => unimplemented!("Serial", addr, val),
-            0xff04...0xff07 => unimplemented!(addr, val),
+            0xff01..=0xff02 => unimplemented!("Serial"),
+            0xff04..=0xff07 => unimplemented!("{}", addr),
 
-            0xff10...0xff3f => unimplemented!(addr, val),
+            0xff10..=0xff3f => unimplemented!("{}", addr),
 
             0xff0f => self.int_flags = val,
 
             0xff46 => {
                 self.ppu_dma = val;
-                unimplemented!()
+                unimplemented!("{}", addr)
             }
 
-            0xfe00...0xfeff | 0xff40...0xff45 | 0xff47...0xff4b | 0xff68...0xff69 | 0xff4f => {
-                unimplemented!(addr, val)
+            0xfe00..=0xfeff | 0xff40..=0xff45 | 0xff47..=0xff4b | 0xff68..=0xff69 | 0xff4f => {
+                unimplemented!("{}", addr)
             }
 
             0xff4d => {} // Speedswitch
             0xff70 => {
                 self.svbk = val & 0b111;
-                self.update_ram_offset()
+                unimplemented!("{}", addr)
+                // self.update_ram_offset()
             }
 
             0xff7f => {} // TETRIS writes to this address for some reason
 
-            0xff80...0xfffe => self.zram[(addr - 0xFF80) as usize] = val,
+            0xff80..=0xfffe => self.vram[(addr - 0xFF80) as usize] = val,
             0xffff => self.int_enable = val,
             _ => panic!("Write: addr not in range: 0x{:x} - val: 0x{:x}", addr, val),
         }
@@ -219,7 +221,7 @@ impl CPU {
                 let regi = self.getreg(reg);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
-                self.a = (self.a + *regi + *c) as u8;
+                self.a = (self.a + *regi + c) as u8;
 
                 self.set_flags(
                     self.a == 0,
