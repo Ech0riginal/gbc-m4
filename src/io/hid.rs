@@ -1,5 +1,5 @@
-use atsamd_hal::prelude::*;
 use atsamd_hal::gpio::*;
+use atsamd_hal::prelude::*;
 
 pub enum Pressed {
     Up,

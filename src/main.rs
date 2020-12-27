@@ -17,7 +17,6 @@ use itsybitsy_m4::watchdog::{Watchdog, WatchdogTimeout};
 
 use io::*;
 
-
 #[entry]
 fn main() -> ! {
     // Example blinky_led
@@ -39,7 +38,6 @@ fn main() -> ! {
     event_loop(pins, wdt, delay)
 }
 
-
 fn event_loop(mut pins: itsybitsy_m4::Pins, mut wdt: Watchdog, _delay: Delay) -> ! {
     wdt.start(WatchdogTimeout::Cycles256 as u8);
     // Turns off the indicator until we need it
@@ -54,19 +52,19 @@ fn event_loop(mut pins: itsybitsy_m4::Pins, mut wdt: Watchdog, _delay: Delay) ->
         right: pins.d9.into_pull_up_input(&mut pins.port),
         menu: pins.i2c_sda.into_pull_up_input(&mut pins.port),
     };
-    
+
     loop {
         // You can verify this works by doing something akin to
         // hid::Pressed::Up => _indicator.set_high().unwrap(),
         match buttons.pressed() {
-            hid::Pressed::Up => {},
-            hid::Pressed::Down => {},
-            hid::Pressed::Left => {},
-            hid::Pressed::Right => {},
-            hid::Pressed::None => {},
-            hid::Pressed::A => {},
-            hid::Pressed::B => {},
-            hid::Pressed::Menu => {},
+            hid::Pressed::Up => {}
+            hid::Pressed::Down => {}
+            hid::Pressed::Left => {}
+            hid::Pressed::Right => {}
+            hid::Pressed::None => {}
+            hid::Pressed::A => {}
+            hid::Pressed::B => {}
+            hid::Pressed::Menu => {}
         }
         wdt.feed();
     }

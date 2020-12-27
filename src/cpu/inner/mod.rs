@@ -8,11 +8,11 @@ pub use memory_bus::*;
 
 pub enum Register {
     A,
+    F,
     B,
     C,
     D,
     E,
-    F,
     H,
     L,
     AF,

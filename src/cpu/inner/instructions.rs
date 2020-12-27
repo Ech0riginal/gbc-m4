@@ -3,18 +3,26 @@ use crate::cpu::inner::*;
 // Trusting https://blog.ryanlevick.com/DMG-01/public/book/cpu/register_data_instructions.html for now
 // (\b[A-Z]*\b)\s\(.* in case i need this again
 
+struct OpCode {
+    code: u8,
+    flags: u8
+}
+
+
 pub enum Instruction {
     /// ADDs an 8-bit register to A, our 8-bit accumulator
     ADD8(Register),
     /// ADDs a 16-bit register to HL, our 16-bit accumulator
     ADD16(Register),
-    ADC(Register, Register),
+    ADC(Register),
     SUB(Register),
-    SBC,
+    SBC(Register),
     AND(Register),
     OR(Register),
     XOR(Register),
     CP,
+    JP,
+    JR,
     INC,
     DEC,
     CCF,
@@ -36,10 +44,10 @@ pub enum Instruction {
     SRA(Register),
     /// Left-shift target by 1
     SLA(Register),
-    /// Swap nibbles of target
+    /// Swap nibbles of 8-bit target
     SWAP8(Register),
+    /// Swap bytes of 16-bit target
     SWAP16(Register),
-
 }
 
 impl Instruction {

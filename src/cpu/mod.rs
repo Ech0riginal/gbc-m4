@@ -2,8 +2,8 @@
 
 mod inner;
 
-use inner::*;
 use core::ops::Sub;
+use inner::*;
 
 // CPU flag positionsz
 const ZERO_FLAG_BYTE_POSITION: u8 = 7;
@@ -13,7 +13,7 @@ const CARRY_FLAG_BYTE_POSITION: u8 = 4;
 
 // https://github.com/nekronos/gbc_rs/blob/master/src/gbc/interconnect.rs
 
-#[repr(packed(8))]
+#[repr(C)]
 struct CPU {
     /// Accumulator register
     a: u8,
@@ -60,8 +60,6 @@ impl CPU {
         let inst = self.get_instruction();
 
         self.execute(inst);
-
-
     }
 
     fn get_instruction(&mut self) -> Instruction {
@@ -98,28 +96,59 @@ impl CPU {
                 let hl = self.getreg(Register::HL) as *mut u16;
                 // luckily, this will lock us to 16 bits
                 let (nv, did_overflow) = (*hl).overflowing_add(a);
-                *hl = nv;
-
-                self.set_flags(nv == 0, false, did_overflow, ((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0);
-                let _ = self.pc.wrapping_add(1);
-            }
-            Instruction::ADC(dst, src) => {
-                let dst = self.getreg(dst);
-                let src = self.getreg(src);
-                let c = if self.reg.carry { 1 } else { 0 };
-
-                *dst = (*dst + *src + *c) as u8;
+                *hl = nv; // TODO due to the Endianness of ARMv7-M & x86, this is bugged.
 
                 self.set_flags(
-                    *dst == 0,
+                    nv == 0,
                     false,
-                    ((a & 0x0f) + (b & 0x0f) + c) > 0x0f,
-                    *dst > 0x0F
+                    did_overflow,
+                    ((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0,
                 );
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SUB(reg) => {}
-            Instruction::SBC => {}
+            Instruction::ADC(reg) => {
+                let regi = self.getreg(reg);
+                let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
+
+                self.a = (self.a + *regi + *c) as u8;
+
+                self.set_flags(
+                    self.a == 0,
+                    false,
+                    ((self.a & 0x0F) + (*regi & 0x0F) + c) > 0x0F,
+                    self.a > 0x0F,
+                );
+                let _ = self.pc.wrapping_add(1);
+            }
+            Instruction::SUB(reg) => {
+                let regi = self.getreg(reg);
+                let r  = self.a.wrapping_sub(*regi);
+                let c = (self.a ^ *regi ^ r) as u16;
+
+                self.a = r;
+
+                self.set_flags(
+                    self.a == 0,
+                    true,
+                    (c & 0x0010) != 0,
+                    (c & 0x0010) != 0,
+
+                )
+            }
+            Instruction::SBC( reg) => {
+                let regi = self.getreg(dst);
+                let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
+
+                self.a = self.a.wrapping_sub(*regi).wrapping_sub(c);
+
+                self.set_flags(
+                    self.a == 0,
+                    true,
+                    self.a < 0,
+                    ((self.a & 0x0F) - (*regi & 0x0F) - c) < 0,
+                );
+                let _ = self.pc.wrapping_add(1);
+            }
             Instruction::AND(reg) => {
                 self.a = self.a & *self.getreg(reg);
                 self.set_flags(self.a == 0, false, true, false);
@@ -128,13 +157,17 @@ impl CPU {
             Instruction::OR(reg) => {}
             Instruction::XOR(reg) => {}
             Instruction::CP => {}
+            Instruction::JP => {
+
+            }
+            Instruction::JR => {}
             Instruction::INC => {}
             Instruction::DEC => {}
             Instruction::CCF => {}
             Instruction::SCF => {
                 self.flag.carry(true);
                 let _ = self.pc.wrapping_add(1);
-            },
+            }
             Instruction::RRA => {}
             Instruction::RLA => {}
             Instruction::RRCA => {}
@@ -163,21 +196,21 @@ impl CPU {
             Instruction::SRA(reg) => {
                 *self.getreg(reg) >>= 1;
                 let _ = self.pc.wrapping_add(1);
-            },
+            }
             Instruction::SLA(reg) => {
                 *self.getreg(reg) <<= 1;
                 let _ = self.pc.wrapping_add(1);
-            },
+            }
             Instruction::SWAP8(reg) => {
                 let r = self.getreg(reg);
-                *r = ((*r & 0x0F) << 4 ) | (( *r & 0xF0) >> 4);
+                *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
 
                 self.set_flags(*r == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::SWAP16(reg) => {
                 let r = self.getreg(reg) as *mut u16;
-                *r = ((*r & 0x00FF) << 8 ) | (( *r & 0xFF00) >> 8);
+                *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8); // TODO test this
 
                 self.set_flags(*r == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
@@ -210,7 +243,7 @@ impl CPU {
     /// assert_eq!(*cpu.getreg(Register::H), 0b0000_0001);
     /// assert_eq!(*cpu.getreg(Register::L), 0b1010_0100);
     /// ```
-    pub (crate) fn getreg(&mut self, r: Register) -> *mut u8 {
+    pub(crate) fn getreg(&mut self, r: Register) -> *mut u8 {
         match r {
             // Registers
             Register::A => &mut self.a,

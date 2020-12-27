@@ -1,3 +1,1 @@
-pub fn init_spi() {
-
-}
+pub fn init_spi() {}
