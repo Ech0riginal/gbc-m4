@@ -154,25 +154,23 @@ impl CPU {
                 self.set_flags(self.a == 0, false, true, false);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::OR(reg) => {}
-            Instruction::XOR(reg) => {}
-            Instruction::CP => {}
-            Instruction::JP => {
-
-            }
-            Instruction::JR => {}
-            Instruction::INC => {}
-            Instruction::DEC => {}
-            Instruction::CCF => {}
+            Instruction::OR(reg) => { unimplemented!() }
+            Instruction::XOR(reg) => { unimplemented!() }
+            Instruction::CP => { unimplemented!() }
+            Instruction::JP => { unimplemented!() }
+            Instruction::JR => { unimplemented!() }
+            Instruction::INC => { unimplemented!() }
+            Instruction::DEC => { unimplemented!() }
+            Instruction::CCF => { unimplemented!() }
             Instruction::SCF => {
                 self.flag.carry(true);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::RRA => {}
-            Instruction::RLA => {}
-            Instruction::RRCA => {}
-            Instruction::RRLA => {}
-            Instruction::CPL => {}
+            Instruction::RRA => { unimplemented!() }
+            Instruction::RLA => { unimplemented!() }
+            Instruction::RRCA => { unimplemented!() }
+            Instruction::RRLA => { unimplemented!() }
+            Instruction::CPL => { unimplemented!() }
             Instruction::BIT(bit, reg) => {
                 let r = self.getreg(reg);
                 // TODO flag factory; this's ridiculous, or is it? investigate once cpu's done
@@ -188,11 +186,11 @@ impl CPU {
                 let r = self.getreg(reg);
                 *r = *r | !(0x01 << bit);
             }
-            Instruction::SRL => {}
-            Instruction::RR => {}
-            Instruction::RL => {}
-            Instruction::RRC => {}
-            Instruction::RLC => {}
+            Instruction::SRL => { unimplemented!() }
+            Instruction::RR => { unimplemented!() }
+            Instruction::RL => { unimplemented!() }
+            Instruction::RRC => { unimplemented!() }
+            Instruction::RLC => { unimplemented!() }
             Instruction::SRA(reg) => {
                 *self.getreg(reg) >>= 1;
                 let _ = self.pc.wrapping_add(1);
@@ -260,5 +258,20 @@ impl CPU {
             Register::DE => &mut self.d,
             Register::HL => &mut self.h,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cpu::CPU;
+
+    fn cpu() -> CPU {
+        CPU::new()
+    }
+
+
+    #[test]
+    fn test_add_8() {
+
     }
 }
