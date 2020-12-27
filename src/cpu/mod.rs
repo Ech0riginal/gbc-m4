@@ -11,6 +11,11 @@ const SUBTRACT_FLAG_BYTE_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BYTE_POSITION: u8 = 5;
 const CARRY_FLAG_BYTE_POSITION: u8 = 4;
 
+macro_rules! get_regi {
+    () => {
+        self.get_register(reg);
+    }
+}
 
 #[repr(packed)]
 #[derive(Debug)]
@@ -56,16 +61,50 @@ impl CPU {
         }
     }
 
-    pub fn execute(
-        &mut self,
-        inst: Instruction,
-    ) {
+    pub fn execute(&mut self, inst: Instruction) {
         match inst {
-            Instruction::ADD(regi) => unsafe {
-                let (new_value, did_overflow) = self.a.overflowing_add(
-                    *self.get_register(regi)
-                );
+            // Shouldn't need vregi guards on this
+            Instruction::ADD(reg) => unsafe {
+                let regi = self.get_register(reg);
+                let (new_value, did_overflow) = self.a.overflowing_add(*regi);
+
+                self.f.zero(new_value == 0);
+                self.f.subtract(false);
+                self.f.carry(did_overflow);
+                self.f.half_carry((*regi & 0xF) + (value & 0xF) > 0xF);
+
                 self.a = new_value;
+            }
+            Instruction::ADDHL => {}
+            Instruction::ADC => {}
+            Instruction::SUB => {}
+            Instruction::SBC => {}
+            Instruction::AND => {}
+            Instruction::OR => {}
+            Instruction::XOR => {}
+            Instruction::CP => {}
+            Instruction::INC => {}
+            Instruction::DEC => {}
+            Instruction::CCF => {}
+            Instruction::SCF => self.f.carry(true),
+            Instruction::RRA => {}
+            Instruction::RLA => {}
+            Instruction::RRCA => {}
+            Instruction::RRLA => {}
+            Instruction::CPL => {}
+            Instruction::BIT => {}
+            Instruction::RESET => {}
+            Instruction::SET => {}
+            Instruction::SRL => {}
+            Instruction::RR => {}
+            Instruction::RL => {}
+            Instruction::RRC => {}
+            Instruction::RLC => {}
+            Instruction::SRA(reg) => {}
+            Instruction::SLA(reg) => {}
+            Instruction::SWAP(reg) => unsafe {
+                let r = self.get_register(reg);
+                *r = ((*r & 0x0f) << 4 ) | (( *r & 0xf0) >> 4);
             }
         }
     }

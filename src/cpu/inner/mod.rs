@@ -1,7 +1,9 @@
 mod flag_register;
+mod instructions;
 mod memory_bus;
 
 pub use flag_register::*;
+pub use instructions::*;
 pub use memory_bus::*;
 
 pub enum Register {
@@ -17,10 +19,4 @@ pub enum Register {
     BC,
     DE,
     HL,
-}
-
-pub enum Instruction {
-    ADD(Register), // ADD adds the register to A
-
-
 }
