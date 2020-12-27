@@ -43,7 +43,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn from_pc(byte: u8, prefixed: bool) -> Self {
+    pub fn from_memory(prefixed: bool, byte: u8) -> Self {
         // The GBC's instruction set is about 50/50
         // prefixed vs non, so order shouldn't matter
         if !prefixed {

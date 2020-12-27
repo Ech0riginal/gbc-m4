@@ -3,6 +3,7 @@
 mod inner;
 
 use inner::*;
+use core::ops::Sub;
 
 // CPU flag positionsz
 const ZERO_FLAG_BYTE_POSITION: u8 = 7;
@@ -56,7 +57,15 @@ impl CPU {
     }
 
     pub unsafe fn cycle(&mut self) {
-        let (inst, prefixed) = {
+        let inst = self.get_instruction();
+
+        self.execute(inst);
+
+
+    }
+
+    fn get_instruction(&mut self) -> Instruction {
+        let (byte, prefixed) = {
             let tmp = self.bus.read_byte(self.pc);
             if tmp == 0xCB {
                 (self.bus.read_byte(self.pc + 1), true)
@@ -65,13 +74,13 @@ impl CPU {
             }
         };
 
-
-
+        Instruction::from_memory(prefixed, byte)
     }
 
     pub unsafe fn execute(&mut self, inst: Instruction) {
         match inst {
             // super handy - https://meganesulli.com/generate-gb-opcodes/
+            // TODO docs on each instruction - shit's so disparate, get insight from megan?
             Instruction::ADD8(reg) => {
                 let regi = self.getreg(reg);
                 let (nv, did_overflow) = self.a.overflowing_add(*regi);
@@ -82,35 +91,25 @@ impl CPU {
                 self.flag.half_carry((*regi & 0xF) + (nv & 0xF) > 0xF);
 
                 self.a = nv;
-                self.pc.wrapping_add(1);
+                let _ = self.pc.wrapping_add(1);
             }
             Instruction::ADD16(reg) => {
                 let a = *self.getreg(reg) as u16;
                 let hl = self.getreg(Register::HL) as *mut u16;
                 // luckily, this will lock us to 16 bits
                 let (nv, did_overflow) = (*hl).overflowing_add(a);
-
-                self.flag.zero(nv == 0);
-                self.flag.subtract(false);
-                self.flag.carry(did_overflow);
-                self.flag.half_carry(((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0);
-
                 *hl = nv;
-                self.pc.wrapping_add(1);
+
+                self.set_flags(nv == 0, false, did_overflow, ((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0);
+                let _ = self.pc.wrapping_add(1);
             }
             Instruction::ADC => {}
             Instruction::SUB(reg) => {}
             Instruction::SBC => {}
             Instruction::AND(reg) => {
-                let nv = self.a & *self.getreg(reg);
-
-                self.flag.zero(nv == 0);
-                self.flag.subtract(false);
-                self.flag.half_carry(true);
-                self.flag.carry(false);
-
-                self.a = nv;
-                self.pc.wrapping_add(1);
+                self.a = self.a & *self.getreg(reg);
+                self.set_flags(self.a == 0, false, true, false);
+                let _ = self.pc.wrapping_add(1);
             }
             Instruction::OR(reg) => {}
             Instruction::XOR(reg) => {}
@@ -120,7 +119,7 @@ impl CPU {
             Instruction::CCF => {}
             Instruction::SCF => {
                 self.flag.carry(true);
-                self.pc.wrapping_add(1);
+                let _ = self.pc.wrapping_add(1);
             },
             Instruction::RRA => {}
             Instruction::RLA => {}
@@ -130,7 +129,7 @@ impl CPU {
             Instruction::BIT(bit, reg) => {
                 let r = self.getreg(reg);
                 // TODO flag factory; this's ridiculous, or is it? investigate once cpu's done
-                self.flag.zero((*r >> bit & 0x01) == 0);
+                self.flag.zero(((*r >> bit) & 0x01) == 0);
                 self.flag.subtract(false);
                 self.flag.half_carry(true);
             }
@@ -149,34 +148,35 @@ impl CPU {
             Instruction::RLC => {}
             Instruction::SRA(reg) => {
                 *self.getreg(reg) >>= 1;
-                self.pc.wrapping_add(1);
+                let _ = self.pc.wrapping_add(1);
             },
             Instruction::SLA(reg) => {
                 *self.getreg(reg) <<= 1;
-                self.pc.wrapping_add(1);
+                let _ = self.pc.wrapping_add(1);
             },
             Instruction::SWAP8(reg) => {
                 let r = self.getreg(reg);
                 *r = ((*r & 0x0F) << 4 ) | (( *r & 0xF0) >> 4);
 
-                self.flag.zero(*r == 0);
-                self.flag.subtract(false);
-                self.flag.half_carry(false);
-                self.flag.carry(false);
-
-                self.pc.wrapping_add(1);
+                self.set_flags(*r == 0, false, false, false);
+                let _ = self.pc.wrapping_add(1);
             }
             Instruction::SWAP16(reg) => {
                 let r = self.getreg(reg) as *mut u16;
-
                 *r = ((*r & 0x00FF) << 8 ) | (( *r & 0xFF00) >> 8);
 
-                self.flag.zero(*r == 0);
-                self.flag.subtract(false);
-                self.flag.half_carry(false);
-                self.flag.carry(false);
+                self.set_flags(*r == 0, false, false, false);
             }
         }
+    }
+
+    /// Just a helper function to get rid of some cruft, only applicable when
+    /// we have to touch every flag.
+    fn set_flags(&mut self, zero: bool, subtract: bool, half_carry: bool, carry: bool) {
+        self.flag.zero(zero);
+        self.flag.subtract(subtract);
+        self.flag.half_carry(half_carry);
+        self.flag.carry(carry);
     }
 
     /// Returns a pointer to the specified Register, mainly so that we can
@@ -195,7 +195,7 @@ impl CPU {
     /// assert_eq!(*cpu.getreg(Register::H), 0b0000_0001);
     /// assert_eq!(*cpu.getreg(Register::L), 0b1010_0100);
     /// ```
-    pub fn getreg(&mut self, r: Register) -> *mut u8 {
+    pub (crate) fn getreg(&mut self, r: Register) -> *mut u8 {
         match r {
             // Registers
             Register::A => &mut self.a,
@@ -211,35 +211,6 @@ impl CPU {
             Register::BC => &mut self.b,
             Register::DE => &mut self.d,
             Register::HL => &mut self.h,
-        }
-    }
-
-    pub fn set_register(
-        &mut self,
-        reg: Register,
-        v: u16,
-    ) {
-        match reg {
-            // if i'm correct, since m4's don't have mmu, we should be able
-            // to overflow into the next byte when we assign a 16 bit value
-            // to the first register's addresses, but lets get this working first
-            Register::AF => {
-                self.a = ((v & 0xFF00) >> 8) as u8;
-                self.flag = (v & 0xFF) as u8;
-            }
-            Register::BC => {
-                self.b = ((v & 0xFF00) >> 8) as u8;
-                self.c = (v & 0xFF) as u8;
-            }
-            Register::DE => {
-                self.d = ((v & 0xFF00) >> 8) as u8;
-                self.e = (v & 0xFF) as u8;
-            }
-            Register::HL => {
-                self.h = ((v & 0xFF00) >> 8) as u8;
-                self.l = (v & 0xFF) as u8;
-            }
-            _ => unsafe { *self.getreg(reg) = v as u8 },
         }
     }
 }
