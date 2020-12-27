@@ -101,11 +101,17 @@ impl CPU {
     /// the program counter before returning the value.
     fn d8(&mut self) -> u8 {
         let pc = self.pc;
-        unimplemented!("d8")
+        let value = self.read(pc);
+        self.pc = self.pc.wrapping_add(1);
+        value
     }
 
+    /// Loads the first two bytes of immediate data in the program counter
+    /// and increments the counter before returning the value.
     fn d16(&mut self) -> u16 {
-        unimplemented!("d16")
+        let low = self.d8() as u16;
+        let high = self.d8() as u16;
+        (high << 8) | low
     }
 
     fn read(&mut self, addr: u16) -> u8 {
@@ -115,7 +121,7 @@ impl CPU {
             0xa000..=0xbfff => unimplemented!("{}", addr),
             0xc000..=0xcfff => unimplemented!("{}", addr),
             0xd000..=0xdfff => unimplemented!("{}", addr),
-            0xe000..=0xfdff => self.read(addr - 0xe000 + 0xC000),
+            0xe000..=0xfdff => self.read(addr - 0xE000 + 0xC000),
 
             0xff00 => unimplemented!("{}", addr),
 
@@ -143,8 +149,7 @@ impl CPU {
         }
     }
 
-    #[allow(ellipsis_inclusive_range_patterns)]
-    pub fn write(&mut self, addr: u16, val: u8) {
+    fn write(&mut self, addr: u16, val: u8) {
         match addr {
             0x0000..=0x7fff => unimplemented!("{}", addr),
             0x8000..=0x9fff => unimplemented!("{}", addr),
