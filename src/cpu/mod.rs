@@ -1,5 +1,8 @@
 // LR35902 ulator
 
+#[cfg(test)]
+mod tests;
+
 mod inner;
 
 use core::ops::Sub;
@@ -10,6 +13,9 @@ const ZERO_FLAG_BYTE_POSITION: u8 = 7;
 const SUBTRACT_FLAG_BYTE_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BYTE_POSITION: u8 = 5;
 const CARRY_FLAG_BYTE_POSITION: u8 = 4;
+
+const VRAM_SIZE: usize = 0x7F;
+const RAM_SIZE: usize = 1024 * 32;
 
 // https://github.com/nekronos/gbc_rs/blob/master/src/gbc/interconnect.rs
 
@@ -56,6 +62,7 @@ impl CPU {
         }
     }
 
+    // Sue me
     pub unsafe fn cycle(&mut self) {
         let inst = self.get_instruction();
 
@@ -73,6 +80,51 @@ impl CPU {
         };
 
         Instruction::from_memory(prefixed, byte)
+    }
+
+    /// Loads the first byte of immediate data in the program counter and increments
+    /// the program counter before returning the value.
+    fn d8(&mut self) -> u8 {
+        let pc = self.pc
+    }
+
+    fn d16(&mut self) -> u16 {
+
+    }
+
+    fn read_pc(&mut self, addr: u16) -> u8 {
+        match addr {
+            0x0000...0x7fff => unimplemented!(addr),
+            0x8000...0x9fff => unimplemented!(addr),
+            0xa000...0xbfff => unimplemented!(addr),
+            0xc000...0xcfff => unimplemented!(addr),
+            0xd000...0xdfff => unimplemented!(addr),
+            0xe000...0xfdff => self.read_pc(addr - 0xe000 + 0xC000),
+
+            0xff00 => unimplemented!(addr),
+
+            0xff01...0xff02 => {
+                // serial IO
+                unimplemented!(addr)
+            }
+            0xff04...0xff07 => unimplemented!(addr),
+
+            0xff10...0xff3f => unimplemented!(addr),
+
+            0xff0f => unimplemented!(addr),
+
+            0xff46 => unimplemented!(addr),
+
+            0xfe00...0xfeff | 0xff40...0xff45 | 0xff47...0xff4b | 0xff68...0xff69 | 0xff4f => {
+                unimplemented!(addr)
+            }
+
+            0xff4d => 0, // Speedswitch
+            0xff70 => unimplemented!(addr),
+            0xff80...0xfffe => self.vram[(addr - 0xFF80) as usize],
+            0xffff => unimplemented!(addr),
+            _ => panic!("Read: addr not in range: 0x{:x}", addr),
+        }
     }
 
     pub unsafe fn execute(&mut self, inst: Instruction) {
@@ -135,8 +187,8 @@ impl CPU {
 
                 )
             }
-            Instruction::SBC( reg) => {
-                let regi = self.getreg(dst);
+            Instruction::SBC(reg) => {
+                let regi = self.getreg(reg);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
                 self.a = self.a.wrapping_sub(*regi).wrapping_sub(c);
@@ -154,13 +206,15 @@ impl CPU {
                 self.set_flags(self.a == 0, false, true, false);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::OR(reg) => { unimplemented!() }
-            Instruction::XOR(reg) => { unimplemented!() }
+            Instruction::OR(_reg) => { unimplemented!() }
+            Instruction::XOR(_reg) => { unimplemented!() }
             Instruction::CP => { unimplemented!() }
             Instruction::JP => { unimplemented!() }
             Instruction::JR => { unimplemented!() }
-            Instruction::INC => { unimplemented!() }
-            Instruction::DEC => { unimplemented!() }
+            Instruction::INC8(_reg) => { unimplemented!() }
+            Instruction::INC16(_reg) => { unimplemented!() }
+            Instruction::DEC8(_reg) => { unimplemented!() }
+            Instruction::DEC16(_reg) => { unimplemented!() }
             Instruction::CCF => { unimplemented!() }
             Instruction::SCF => {
                 self.flag.carry(true);
@@ -173,7 +227,7 @@ impl CPU {
             Instruction::CPL => { unimplemented!() }
             Instruction::BIT(bit, reg) => {
                 let r = self.getreg(reg);
-                // TODO flag factory; this's ridiculous, or is it? investigate once cpu's done
+
                 self.flag.zero(((*r >> bit) & 0x01) == 0);
                 self.flag.subtract(false);
                 self.flag.half_carry(true);
@@ -238,8 +292,8 @@ impl CPU {
     ///
     /// *hl_regi = 0b0000_0001_1010_0100;
     ///
-    /// assert_eq!(*cpu.getreg(Register::H), 0b0000_0001);
-    /// assert_eq!(*cpu.getreg(Register::L), 0b1010_0100);
+    /// assert_eq!(*cpu.getreg(Register::H), 0b1010_0100);
+    /// assert_eq!(*cpu.getreg(Register::L), 0b0000_0001);
     /// ```
     pub(crate) fn getreg(&mut self, r: Register) -> *mut u8 {
         match r {
@@ -258,20 +312,5 @@ impl CPU {
             Register::DE => &mut self.d,
             Register::HL => &mut self.h,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::cpu::CPU;
-
-    fn cpu() -> CPU {
-        CPU::new()
-    }
-
-
-    #[test]
-    fn test_add_8() {
-
     }
 }
