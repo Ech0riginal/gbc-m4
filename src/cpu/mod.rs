@@ -10,21 +10,10 @@ const SUBTRACT_FLAG_BYTE_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BYTE_POSITION: u8 = 5;
 const CARRY_FLAG_BYTE_POSITION: u8 = 4;
 
-macro_rules! get_regi {
-    () => {
-        self.get_register(reg);
-    }
-}
+// https://github.com/nekronos/gbc_rs/blob/master/src/gbc/interconnect.rs
 
-#[repr(packed)]
-#[derive(Debug)]
+#[repr(packed(8))]
 struct CPU {
-    // Program counter
-    pc: u16,
-    // Stack pointer
-    sp: u16,
-    // Memory bus
-    bus: MemoryBus,
     // Accumulator register
     a: u8,
     // CPU flag register
@@ -41,6 +30,12 @@ struct CPU {
     e: u8,
     h: u8,
     l: u8,
+    // Program counter
+    pc: u16,
+    // Stack pointer
+    sp: u16,
+    // Memory bus
+    bus: MemoryBus,
 }
 
 impl CPU {
@@ -49,38 +44,60 @@ impl CPU {
             pc: 0,
             sp: 0,
             bus: [0u8; 65535],
-            a: 0,
-            b: 0,
-            c: 0,
-            d: 0,
-            e: 0,
-            f: 0,
-            h: 0,
-            l: 0
+            a: 0x11,
+            f: 0x00,
+            b: 0x00,
+            c: 0x00,
+            d: 0xFF,
+            e: 0x56,
+            h: 0x00,
+            l: 0x0D,
         }
     }
 
-    pub fn execute(&mut self, inst: Instruction) {
+    pub unsafe fn execute(&mut self, inst: Instruction) {
         match inst {
-            // Shouldn't need vregi guards on this
-            Instruction::ADD(reg) => unsafe {
+            // super handy - https://meganesulli.com/generate-gb-opcodes/
+            Instruction::ADD8(reg) => {
                 let regi = self.get_register(reg);
-                let (new_value, did_overflow) = self.a.overflowing_add(*regi);
+                let (nv, did_overflow) = self.a.overflowing_add(*regi);
 
-                self.f.zero(new_value == 0);
+                self.f.zero(nv == 0);
                 self.f.subtract(false);
                 self.f.carry(did_overflow);
-                self.f.half_carry((*regi & 0xF) + (value & 0xF) > 0xF);
+                self.f.half_carry((*regi & 0xF) + (nv & 0xF) > 0xF);
 
-                self.a = new_value;
+                self.a = nv;
             }
-            Instruction::ADDHL => {}
+            Instruction::ADD16(reg) => {
+                let a = *self.get_register(reg) as u16;
+                let hl = self.get_register(Register::HL) as *mut u16;
+                // luckily, this will lock us to 16 bits
+                let (nv, did_overflow) = (*hl).overflowing_add(a);
+
+                self.f.zero(*hl == 0);
+                self.f.subtract(false);
+                self.f.carry(did_overflow);
+                self.f.half_carry(((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0);
+
+                *hl = nv;
+            }
+
             Instruction::ADC => {}
-            Instruction::SUB => {}
+            Instruction::SUB(reg) => {}
             Instruction::SBC => {}
-            Instruction::AND => {}
-            Instruction::OR => {}
-            Instruction::XOR => {}
+            Instruction::AND(reg) => {
+                let nv = self.a & *self.get_register(reg);
+
+                self.a.zero(nv == 0);
+                self.a.subtract(false);
+                self.a.half_carry(true);
+                self.a.carry(false);
+
+                self.a = nv;
+            }
+            Instruction::OR(reg) => {}
+            Instruction::XOR(reg) => {}
             Instruction::CP => {}
             Instruction::INC => {}
             Instruction::DEC => {}
@@ -92,18 +109,22 @@ impl CPU {
             Instruction::RRLA => {}
             Instruction::CPL => {}
             Instruction::BIT => {}
-            Instruction::RESET => {}
+            Instruction::RES => {}
             Instruction::SET => {}
             Instruction::SRL => {}
             Instruction::RR => {}
             Instruction::RL => {}
             Instruction::RRC => {}
             Instruction::RLC => {}
-            Instruction::SRA(reg) => {}
-            Instruction::SLA(reg) => {}
-            Instruction::SWAP(reg) => unsafe {
+            Instruction::SRA(reg) => {
+                *self.get_register(reg) >>= 1
+            },
+            Instruction::SLA(reg) => {
+                *self.get_register(reg) <<= 1
+            },
+            Instruction::SWAP(reg) => {
                 let r = self.get_register(reg);
-                *r = ((*r & 0x0f) << 4 ) | (( *r & 0xf0) >> 4);
+                *r = ((*r & 0x0f) << 4 ) | (( *r & 0xf0) >> 4)
             }
         }
     }

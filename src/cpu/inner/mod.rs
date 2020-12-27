@@ -6,6 +6,11 @@ pub use flag_register::*;
 pub use instructions::*;
 pub use memory_bus::*;
 
+// pub enum RegisterTarget {
+//     Register(Register),
+//     VirtualRegister(VirtualRegister),
+// }
+
 pub enum Register {
     A,
     B,
@@ -20,3 +25,10 @@ pub enum Register {
     DE,
     HL,
 }
+
+// pub enum VirtualRegister {
+//     AF,
+//     BC,
+//     DE,
+//     HL,
+// }
