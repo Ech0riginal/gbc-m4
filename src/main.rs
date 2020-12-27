@@ -1,7 +1,8 @@
 #![no_std]
 #![no_main]
 
-mod hid;
+mod cpu;
+mod io;
 
 // This import is very much used to indicate a panic handler
 #[allow(unused_imports)]
@@ -13,6 +14,8 @@ use itsybitsy_m4::entry;
 use itsybitsy_m4::pac::{CorePeripherals, Peripherals};
 use itsybitsy_m4::prelude::*;
 use itsybitsy_m4::watchdog::{Watchdog, WatchdogTimeout};
+
+use io::*;
 
 
 #[entry]

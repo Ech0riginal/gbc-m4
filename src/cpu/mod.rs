@@ -1,6 +1,9 @@
 // LR35902 ulator
 
+mod inner;
 mod registers;
+
+use inner::*;
 
 // CPU flag positionsz
 const ZERO_FLAG_BYTE_POSITION: u8 = 7;
@@ -8,59 +11,26 @@ const SUBTRACT_FLAG_BYTE_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BYTE_POSITION: u8 = 5;
 const CARRY_FLAG_BYTE_POSITION: u8 = 4;
 
-enum Register {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    H,
-    L,
-    AF,
-    BC,
-    DE,
-    HL,
-}
-enum Instruction {
-    ADD(Register, Register),
-
-}
-
-
-type MemoryBus = [u8; 65535];
-
-trait Busd {
-    fn read_byte(&self, address: u16) -> u8;
-    fn new() -> Self;
-}
-
-impl Busd for MemoryBus {
-    fn read_byte(&self, address: u16) -> u8 {
-        self[address as usize]
-    }
-
-    fn new() -> Self {
-        [0u8; 65535]
-    }
-}
 
 #[repr(packed)]
 #[derive(Debug)]
 struct CPU {
     // Program counter
     pc: u16,
+    // Stack pointer
+    sp: u16,
     // Memory bus
     bus: MemoryBus,
-    // Registers
+    // Accumulator register
     a: u8,
-    f: u8,
-    //  f: cpu flag register
-    // 0 0 0 0 0 0 0 0
+    // CPU flag register
+    f: FlagRegister,
+    // 0 0 0 0 - trailing nibble isn't used
     // | | | carry
     // | | half carry
     // | subtraction
     // zero
+    // Registers
     b: u8,
     c: u8,
     d: u8,
@@ -73,6 +43,7 @@ impl CPU {
     pub fn new() -> Self {
         Self {
             pc: 0,
+            sp: 0,
             bus: [0u8; 65535],
             a: 0,
             b: 0,
@@ -82,6 +53,20 @@ impl CPU {
             f: 0,
             h: 0,
             l: 0
+        }
+    }
+
+    pub fn execute(
+        &mut self,
+        inst: Instruction,
+    ) {
+        match inst {
+            Instruction::ADD(regi) => unsafe {
+                let (new_value, did_overflow) = self.a.overflowing_add(
+                    *self.get_register(regi)
+                );
+                self.a = new_value;
+            }
         }
     }
 
@@ -104,11 +89,10 @@ impl CPU {
         }
     }
 
-    pub fn execyt(
+    pub fn set_register(
         &mut self,
-        v: u16,
         reg: Register,
-        ins: Instruction,
+        v: u16,
     ) {
         match reg {
             // if i'm correct, since m4's don't have mmu, we should be able
