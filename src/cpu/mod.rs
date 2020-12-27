@@ -22,29 +22,58 @@ enum Register {
     DE,
     HL,
 }
+enum Instruction {
+    ADD(Register, Register),
+
+}
+
+
+type MemoryBus = [u8; 65535];
+
+trait Busd {
+    fn read_byte(&self, address: u16) -> u8;
+    fn new() -> Self;
+}
+
+impl Busd for MemoryBus {
+    fn read_byte(&self, address: u16) -> u8 {
+        self[address as usize]
+    }
+
+    fn new() -> Self {
+        [0u8; 65535]
+    }
+}
 
 #[repr(packed)]
-// packing so that we can
+#[derive(Debug)]
 struct CPU {
-    pub a: u8,
-    pub f: u8,
+    // Program counter
+    pc: u16,
+    // Memory bus
+    bus: MemoryBus,
+    // Registers
+    a: u8,
+    f: u8,
     //  f: cpu flag register
     // 0 0 0 0 0 0 0 0
     // | | | carry
     // | | half carry
     // | subtraction
     // zero
-    pub b: u8,
-    pub c: u8,
-    pub d: u8,
-    pub e: u8,
-    pub h: u8,
-    pub l: u8,
+    b: u8,
+    c: u8,
+    d: u8,
+    e: u8,
+    h: u8,
+    l: u8,
 }
 
 impl CPU {
     pub fn new() -> Self {
         Self {
+            pc: 0,
+            bus: [0u8; 65535],
             a: 0,
             b: 0,
             c: 0,
@@ -56,35 +85,35 @@ impl CPU {
         }
     }
 
-    pub fn get_register(&self, r: Register) -> *const u8 {
+    pub fn get_register(&mut self, r: Register) -> *mut u8 {
         match r {
-            Register::A => &*self.a,
-            Register::B => &*self.b,
-            Register::C => &*self.c,
-            Register::D => &*self.d,
-            Register::E => &*self.e,
-            Register::F => &*self.f,
-            Register::H => &*self.h,
-            Register::L => &*self.l,
-            // if i'm correct, we should be able to overflow into the next register when
-            // we assign a 16 bit value to these addresses
-            Register::AF => &*self.a,
-            Register::BC => &*self.b,
-            Register::DE => &*self.d,
-            Register::HL => &*self.h,
+            // Registers
+            Register::A => &mut self.a,
+            Register::B => &mut self.b,
+            Register::C => &mut self.c,
+            Register::D => &mut self.d,
+            Register::E => &mut self.e,
+            Register::F => &mut self.f,
+            Register::H => &mut self.h,
+            Register::L => &mut self.l,
+            // Virtual registers
+            Register::AF => &mut self.a,
+            Register::BC => &mut self.b,
+            Register::DE => &mut self.d,
+            Register::HL => &mut self.h,
         }
     }
 
-    pub fn set_register(&mut self, r: Register, v: u16) {
-        match r {
-            Register::A => self.a = ((v & 0xFF00) >> 8) as u8,
-            Register::F => self.f = ((v & 0xFF00) >> 8) as u8,
-            Register::B => self.b = ((v & 0xFF00) >> 8) as u8,
-            Register::C => self.c = ((v & 0xFF00) >> 8) as u8,
-            Register::D => self.d = ((v & 0xFF00) >> 8) as u8,
-            Register::E => self.e = ((v & 0xFF00) >> 8) as u8,
-            Register::H => self.h = ((v & 0xFF00) >> 8) as u8,
-            Register::L => self.l = ((v & 0xFF00) >> 8) as u8,
+    pub fn execyt(
+        &mut self,
+        v: u16,
+        reg: Register,
+        ins: Instruction,
+    ) {
+        match reg {
+            // if i'm correct, since m4's don't have mmu, we should be able
+            // to overflow into the next byte when we assign a 16 bit value
+            // to the first register's addresses, but lets get this working first
             Register::AF => {
                 self.a = ((v & 0xFF00) >> 8) as u8;
                 self.f = (v & 0xFF) as u8;
@@ -101,6 +130,7 @@ impl CPU {
                 self.h = ((v & 0xFF00) >> 8) as u8;
                 self.l = (v & 0xFF) as u8;
             }
+            _ => unsafe { *self.get_register(reg) = v as u8 },
         }
     }
 }
