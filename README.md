@@ -14,6 +14,8 @@ handy resources:
 
 The Ultimate GameBoy Talk - https://www.youtube.com/watch?v=HyzD8pNlpwI
 
+awesome docs - https://gbdev.io/pandocs/
+
 GameBoy Programming Manual - https://archive.org/stream/GameBoyProgManVer1.1/GameBoyProgManVer1.1_djvu.txt
 
 ItsyBitsy M4:
