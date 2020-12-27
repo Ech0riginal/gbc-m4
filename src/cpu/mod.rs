@@ -14,8 +14,9 @@ const SUBTRACT_FLAG_BYTE_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BYTE_POSITION: u8 = 5;
 const CARRY_FLAG_BYTE_POSITION: u8 = 4;
 
-const VRAM_SIZE: usize = 0x7F;
+const BUS_SIZE: usize = 65535;
 const RAM_SIZE: usize = 1024 * 32;
+const VRAM_SIZE: usize = 0x7F;
 
 // https://github.com/nekronos/gbc_rs/blob/master/src/gbc/interconnect.rs
 
@@ -41,16 +42,20 @@ struct CPU {
     pc: u16,
     /// Stack pointer
     sp: u16,
+    svbk: u8,
+    ppu_dma: u8,
+    int_enable: u8,
+    int_flags: u8,
+    ram_offset: usize,
     /// Memory bus, see the memory_bus module.
     bus: [u8; 65535],
+    ram: [u8; RAM_SIZE],
+    vram: [u8; VRAM_SIZE],
 }
 
 impl CPU {
     pub fn new() -> Self {
         Self {
-            pc: 0,
-            sp: 0,
-            bus: [0u8; 65535],
             a: 0x11,
             flag: 0x00,
             b: 0x00,
@@ -59,6 +64,16 @@ impl CPU {
             e: 0x56,
             h: 0x00,
             l: 0x0D,
+            pc: 0,
+            sp: 0,
+            svbk: 0,
+            ppu_dma: 0,
+            int_enable: 0,
+            int_flags: 0,
+            ram_offset: 0,
+            bus: [0u8; BUS_SIZE],
+            ram: [0u8; RAM_SIZE],
+            vram: [u8; VRAM_SIZE],
         }
     }
 
@@ -85,21 +100,22 @@ impl CPU {
     /// Loads the first byte of immediate data in the program counter and increments
     /// the program counter before returning the value.
     fn d8(&mut self) -> u8 {
-        let pc = self.pc
+        let pc = self.pc;
+        unimplemented!()
     }
 
     fn d16(&mut self) -> u16 {
-
+        unimplemented!()
     }
 
-    fn read_pc(&mut self, addr: u16) -> u8 {
+    fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000...0x7fff => unimplemented!(addr),
             0x8000...0x9fff => unimplemented!(addr),
             0xa000...0xbfff => unimplemented!(addr),
             0xc000...0xcfff => unimplemented!(addr),
             0xd000...0xdfff => unimplemented!(addr),
-            0xe000...0xfdff => self.read_pc(addr - 0xe000 + 0xC000),
+            0xe000...0xfdff => self.read(addr - 0xe000 + 0xC000),
 
             0xff00 => unimplemented!(addr),
 
@@ -124,6 +140,47 @@ impl CPU {
             0xff80...0xfffe => self.vram[(addr - 0xFF80) as usize],
             0xffff => unimplemented!(addr),
             _ => panic!("Read: addr not in range: 0x{:x}", addr),
+        }
+    }
+
+    pub fn write(&mut self, addr: u16, val: u8) {
+        match addr {
+            0x0000...0x7fff => unimplemented!(addr, val),
+            0x8000...0x9fff => unimplemented!(addr, val),
+            0xa000...0xbfff => unimplemented!(addr, val),
+            0xc000...0xcfff => self.ram[(addr - 0xC000) as usize] = val,
+            0xd000...0xdfff => self.ram[(addr - 0xC000) as usize + self.ram_offset] = val,
+            0xe000...0xfdff => self.write(addr - 0xE000 + 0xC000, val),
+
+            0xff00 => unimplemented!(val),
+
+            0xff01...0xff02 => unimplemented!("Serial", addr, val),
+            0xff04...0xff07 => unimplemented!(addr, val),
+
+            0xff10...0xff3f => unimplemented!(addr, val),
+
+            0xff0f => self.int_flags = val,
+
+            0xff46 => {
+                self.ppu_dma = val;
+                unimplemented!()
+            }
+
+            0xfe00...0xfeff | 0xff40...0xff45 | 0xff47...0xff4b | 0xff68...0xff69 | 0xff4f => {
+                unimplemented!(addr, val)
+            }
+
+            0xff4d => {} // Speedswitch
+            0xff70 => {
+                self.svbk = val & 0b111;
+                self.update_ram_offset()
+            }
+
+            0xff7f => {} // TETRIS writes to this address for some reason
+
+            0xff80...0xfffe => self.zram[(addr - 0xFF80) as usize] = val,
+            0xffff => self.int_enable = val,
+            _ => panic!("Write: addr not in range: 0x{:x} - val: 0x{:x}", addr, val),
         }
     }
 
