@@ -24,7 +24,7 @@ const VRAM_SIZE: usize = 0x7F;
 pub(crate) struct CPU {
     /// Accumulator register
     a: u8,
-    /// CPU flag register, see the flag_register module.
+    /// CPU flag register, see inner/flag_register.rs
     flag: u8,
     // 0 0 0 0 - trailing nibble isn't used
     // | | | carry
@@ -40,14 +40,14 @@ pub(crate) struct CPU {
     l: u8,
     /// Program counter
     pc: u16,
-    /// Stack pointer
+    /// Stack pointer, see inner/program_counter.rs
     sp: u16,
     svbk: u8,
     ppu_dma: u8,
     int_enable: u8,
     int_flags: u8,
     ram_offset: usize,
-    /// Memory bus, see the memory_bus module.
+    /// Memory bus, see inner/memory_bus.rs
     bus: [u8; 65535],
     ram: [u8; RAM_SIZE],
     vram: [u8; VRAM_SIZE],
@@ -114,7 +114,7 @@ impl CPU {
         (high << 8) | low
     }
 
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7fff => unimplemented!("{}", addr),
             0x8000..=0x9fff => unimplemented!("{}", addr),
