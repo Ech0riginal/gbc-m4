@@ -8,7 +8,7 @@ pub enum Instruction {
     ADD8(Register),
     /// ADDs a 16-bit register to HL, our 16-bit accumulator
     ADD16(Register),
-    ADC,
+    ADC(Register, Register),
     SUB(Register),
     SBC,
     AND(Register),

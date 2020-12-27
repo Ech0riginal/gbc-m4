@@ -103,7 +103,21 @@ impl CPU {
                 self.set_flags(nv == 0, false, did_overflow, ((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::ADC => {}
+            Instruction::ADC(dst, src) => {
+                let dst = self.getreg(dst);
+                let src = self.getreg(src);
+                let c = if self.reg.carry { 1 } else { 0 };
+
+                *dst = (*dst + *src + *c) as u8;
+
+                self.set_flags(
+                    *dst == 0,
+                    false,
+                    ((a & 0x0f) + (b & 0x0f) + c) > 0x0f,
+                    *dst > 0x0F
+                );
+                let _ = self.pc.wrapping_add(1);
+            }
             Instruction::SUB(reg) => {}
             Instruction::SBC => {}
             Instruction::AND(reg) => {
@@ -166,6 +180,7 @@ impl CPU {
                 *r = ((*r & 0x00FF) << 8 ) | (( *r & 0xFF00) >> 8);
 
                 self.set_flags(*r == 0, false, false, false);
+                let _ = self.pc.wrapping_add(1);
             }
         }
     }
