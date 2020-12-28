@@ -195,10 +195,9 @@ impl CPU {
             Instruction::ADC(flag, reg) => {
                 let v = self.read_reg(reg);
 
-                let c = if flag == Flag::CY {
-                    if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 }
-                } else {
-                    0
+                let c = match flag {
+                    Flag::CY => if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 },
+                    _ => 0,
                 };
 
                 self.a = (self.a + v + c);
@@ -206,7 +205,7 @@ impl CPU {
                 self.set_flags(
                     self.a == 0,
                     false,
-                    ((self.a & 0x0F) + (*regi & 0x0F) + c) > 0x0F,
+                    ((self.a & 0x0F) + (v & 0x0F) + c) > 0x0F,
                     self.a > 0x0F,
                 );
                 let _ = self.pc.wrapping_add(1);
@@ -312,15 +311,22 @@ impl CPU {
                 }
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SWAP(reg) if !reg.is_virtual() => {
-                let r = self.getreg(reg);
-                *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
+            Instruction::SWAP(reg) => {
+                let v = if reg.is_virtual() {
+                    let r = self.getreg(reg) as *mut u16;
+                    *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8);
+                    *r
+                } else {
+                    let r = self.getreg(reg);
+                    *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
+                    *r as u16
+                };
 
-                self.set_flags(*r == 0, false, false, false);
+                self.set_flags(v == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             },
             Instruction::SWAP(reg) => {
-                let r = self.getreg(reg);
+                let r = self.getreg(reg) as *mut u16;
                 *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8);
 
                 self.set_flags(*r == 0, false, false, false);
