@@ -325,13 +325,6 @@ impl CPU {
                 self.set_flags(v == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             },
-            Instruction::SWAP(reg) => {
-                let r = self.getreg(reg) as *mut u16;
-                *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8);
-
-                self.set_flags(*r == 0, false, false, false);
-                let _ = self.pc.wrapping_add(1);
-            }
             Instruction::CALL(_, _) => { unimplemented!() }
             Instruction::DAA => { unimplemented!() }
             Instruction::LD(_, _, _) => { unimplemented!() }
