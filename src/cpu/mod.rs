@@ -249,7 +249,11 @@ impl CPU {
                 self.set_flags(self.a == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::XOR(_reg) => { unimplemented!() }
+            Instruction::XOR(reg) => {
+                self.a = self.a ^ self.read_reg(reg);
+                self.set_flags(self.a == 0, false, false, false);
+                let _ = self.pc.wrapping_add(1);
+            }
             Instruction::CP(_reg) => { unimplemented!() }
             Instruction::JP(_flag, _reg) => { unimplemented!() }
             Instruction::JR(_flag, _reg) => { unimplemented!() }
