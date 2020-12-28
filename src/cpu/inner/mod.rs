@@ -76,5 +76,8 @@ pub enum Flag {
     /// Half-carry flag
     HCY,
     /// Tells the cpu that the registers given contain the value and the address to store to RAM
-    RAM
+    RAM,
+    /// Tells the cpu that the registers given contain the value and the address to store to VRAM
+    VRAM,
+
 }

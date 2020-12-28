@@ -5,45 +5,82 @@ use crate::cpu::inner::Register::*;
 // Trusting https://blog.ryanlevick.com/DMG-01/public/book/cpu/register_data_instructions.html for now
 // (\b[A-Z]*\b)\s\(.* in case i need this again
 
-/// These instructions are how we tell the M4 what to actually do based on what the ROM says
+/// Usable instructions for us to execute on based on an opcode `from_memory`. Do not derive
+/// any meaning from the order of the instructions, there is no method to the madness here.
 pub enum Instruction {
+    /// No operation
     NOP,
     /// ADDs an 8-bit register to A, our 8-bit accumulator
     ADD8(Register),
     /// ADDs a 16-bit register to HL, our 16-bit accumulator
     ADD16(Register),
+    // TODO ADC DOC
     ADC(Flag, Register),
+    // TODO SUB DOC
     SUB8(Register),
+    // TODO SUB16 DOC
     SUB16(Register),
+    // TODO SBC DOC
     SBC(Flag, Register),
+    // TODO AND DOC
     AND(Register),
+    // TODO OR DOC
     OR(Register),
+    // TODO XOR DOC
     XOR(Register),
+    // TODO CP DOC
     CP(Register),
+    // TODO CALL DOC
     CALL(Flag, Register),
+    // TODO JP DOC
     JP(Flag, Register),
+    // TODO JR DOC
     JR(Flag, Register),
+    // TODO INC DOC
     INC8(Register),
+    // TODO INC DOC
     INC16(Register), // TODO implement the is_virtual logic in CPU to get rid of these 8 by 16s
+    // TODO DEC DOC
     DEC8(Register),
+    // TODO DEC DOC
     DEC16(Register),
+    // TODO DAA DOC
     DAA,
+    // TODO CCF DOC
     CCF,
+    // TODO SCF DOC
     SCF,
+    // TODO RRA DOC
     RRA,
+    // TODO RLA DOC
     RLA,
+    // TODO RRCA DOC
     RRCA,
+    // TODO RRLA DOC
     RRLA,
+    // TODO CPL DOC
     CPL,
+    // TODO LD DOC
     LD(Flag, Register, Register),
+    // TODO LDR DOC
     LDR(Flag, Register),
+    /// Add the 8-bit signed operand s8 to the stack pointer SP, and store the result in register pair HL.
+    LDSP,
+    // TODO BIT DOC
     BIT(u8, Register),
+    // TODO RES DOC
     RES(u8, Register),
+    // TODO SET DOC
     SET(u8, Register),
+    // TODO SRL DOC
     SRL,
+    // TODO RR DOC
     RR,
+    // TODO RL DOC
     RL,
+    // TODO RRC DOC
     RRC,
+    // TODO RLC DOC
     RLC,
     /// Accumulator arithmetic right-shift, then place bit 7 into the CY flag
     RLCA,
@@ -55,13 +92,25 @@ pub enum Instruction {
     SWAP8(Register),
     /// Swap bytes of 16-bit target
     SWAP16(Register),
+    /// Halt (and catch fire)
     HCF,
+    // TODO POP DOC
     POP(Register),
+    // TODO PUSH DOC
     PUSH(Register),
+    // TODO STOP DOC
     STOP,
+    // TODO RST DOC
     RST(u16),
+    // TODO RET DOC
     RET(Flag),
+    // TODO RETI DOC
     RETI,
+    /// Set the interrupt master enable (IME) flag and enable maskable interrupts. This instruction can be used in an interrupt routine to enable higher-order interrupts.
+    EI,
+    /// Reset the interrupt master enable (IME) flag and prohibit maskable interrupts.
+    DI,
+    // TODO CB DOC
     #[allow(non_camel_case_types)]
     CB_INSTRUCTION,
 }
@@ -284,7 +333,7 @@ impl Instruction {
             0xC8 => Self::RET(NZ),
             0xC9 => Self::RET(NF),
             0xCA => Self::JP(NZ, D16),
-            0xCB => Self::CB_INSTRUCTION, // TODO impl
+            0xCB => Self::CB_INSTRUCTION, // TODO CB_INSTRUCTION handler
             0xCC => Self::CALL(NZ, D16),
             0xCD => Self::CALL(NF, D16),
             0xCE => Self::ADC(CY, D8),
@@ -302,30 +351,30 @@ impl Instruction {
             0xDC => Self::CALL(CY, D16),
             0xDE => Self::SBC(CY, D8),
             0xDF => Self::RST(0x18),
-            0xE0 => Self::LD(RAM, D8, A),
+            0xE0 => Self::LD(STR, D8, A),
             0xE1 => Self::POP(HL),
-            0xE2 => Self::LD(RAM, C, A),
+            0xE2 => Self::LD(STR, C, A),
             0xE5 => Self::PUSH(HL),
             0xE6 => Self::AND(D8),
             0xE7 => Self::RST(0x20),
             0xE8 => Self::ADD16(SP),
             0xE9 => Self::JP(NF, HL),
- //            0xEA => Self::LD(D16), A,
- //            0xEE => Self::XOR(D8),
- //            0xEF => Self::RST(0x28),
- //            0xF0 => Self::LD(A, ZIMM8),
- //            0xF1 => Self::POP(AF),
- //            0xF2 => Self::LD(A, ZC),
- //            0xF3 => Self::DI,
- //            0xF5 => Self::PUSH(AF),
- //            0xF6 => Self::OR(D8),
- //            0xF7 => Self::RST(0x30),
- //            0xF8 => Self::LD_HL_SP,
- //            0xF9 => Self::LD(SP, HL),
- //            0xFA => Self::LD(A, D16),
- //            0xFB => Self::EI,
- //            0xFE => Self::CP(D8),
- //            0xFF => Self::RST(0x38),
+            0xEA => Self::LD(STR, D16, A),
+            0xEE => Self::XOR(D8),
+            0xEF => Self::RST(0x28),
+            0xF0 => Self::LD(GRB, A, D8),
+            0xF1 => Self::POP(AF),
+            0xF2 => Self::LD(GRB, A, C),
+            0xF3 => Self::DI,
+            0xF5 => Self::PUSH(AF),
+            0xF6 => Self::OR(D8),
+            0xF7 => Self::RST(0x30),
+            0xF8 => Self::LDSP,
+            0xF9 => Self::LD(NF, SP, HL),
+            0xFA => Self::LD(NF, A, D16),
+            0xFB => Self::EI,
+            0xFE => Self::CP(D8),
+            0xFF => Self::RST(0x38),
             _ => {
                 panic!("Could not match opcode {}", opcode);
                 Self::NOP
