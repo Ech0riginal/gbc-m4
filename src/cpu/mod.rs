@@ -225,7 +225,7 @@ impl CPU {
 
                 )
             },
-            Instruction::SBC(_flag, reg) => {
+            Instruction::SBC(reg) => {
                 let regi = self.getreg(reg);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
@@ -240,11 +240,15 @@ impl CPU {
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::AND(reg) => {
-                self.a = self.a & *self.getreg(reg); // TODO what's _actually_ gonna happen once we try to load HL into here
+                self.a = self.a & self.read_reg(reg);
                 self.set_flags(self.a == 0, false, true, false);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::OR(_reg) => { unimplemented!() }
+            Instruction::OR(reg) => {
+                self.a = self.a | self.read_reg(reg);
+                self.set_flags(self.a == 0, false, false, false);
+                let _ = self.pc.wrapping_add(1);
+            }
             Instruction::XOR(_reg) => { unimplemented!() }
             Instruction::CP(_reg) => { unimplemented!() }
             Instruction::JP(_flag, _reg) => { unimplemented!() }
