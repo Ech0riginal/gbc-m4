@@ -7,6 +7,7 @@ use crate::cpu::inner::Register::*;
 
 /// Usable instructions for us to execute on based on an opcode `from_memory`. Do not derive
 /// any meaning from the order of the instructions, there is no method to the madness here.
+/// This will probably change as I get into timings.
 pub enum Instruction {
     /// No operation
     NOP,
@@ -15,7 +16,9 @@ pub enum Instruction {
     ADD(Register),
     // TODO ADC DOC
     ADC(Flag, Register),
-    // TODO SUB DOC
+    /// Subtract the contents of `Register` from the contents of register A, and store the results
+    /// in register A. If the HL register is passed, SUB will read from memory at the address
+    /// specified in HL and subtract that value from A, and store the result in register A.
     SUB(Register),
     // TODO SBC DOC
     SBC(Flag, Register),
@@ -120,7 +123,7 @@ impl Instruction {
     // self\.(.*)\((.*)\),
     // Self::\U$1($2),
     fn from_raw_instruction(byte: u8) -> Self {
-        match opcode {
+        match byte {
             0x00 => Self::NOP,
             0x01 => Self::LD(NF, BC, D16),
             0x02 => Self::LD(STR, BC, A),
@@ -265,14 +268,14 @@ impl Instruction {
             0x8D => Self::ADC(CY, L),
             0x8E => Self::ADC(CY, HL),
             0x8F => Self::ADC(NF, A),
-            0x90 => Self::SUB8(B),
-            0x91 => Self::SUB8(C),
-            0x92 => Self::SUB8(D),
-            0x93 => Self::SUB8(E),
-            0x94 => Self::SUB8(H),
-            0x95 => Self::SUB8(L),
-            0x96 => Self::SUB8(HL),
-            0x97 => Self::SUB8(A),
+            0x90 => Self::SUB(B),
+            0x91 => Self::SUB(C),
+            0x92 => Self::SUB(D),
+            0x93 => Self::SUB(E),
+            0x94 => Self::SUB(H),
+            0x95 => Self::SUB(L),
+            0x96 => Self::SUB(HL),
+            0x97 => Self::SUB(A),
             0x98 => Self::SBC(CY, B),
             0x99 => Self::SBC(CY, C),
             0x9A => Self::SBC(CY, D),
@@ -334,7 +337,7 @@ impl Instruction {
             0xD2 => Self::JP(NC, D16),
             0xD4 => Self::CALL(NC, D16),
             0xD5 => Self::PUSH(DE),
-            0xD6 => Self::SUB8(D8),
+            0xD6 => Self::SUB(D8),
             0xD7 => Self::RST(0x10),
             0xD8 => Self::RET(CY),
             0xD9 => Self::RETI,
@@ -367,7 +370,7 @@ impl Instruction {
             0xFE => Self::CP(D8),
             0xFF => Self::RST(0x38),
             _ => {
-                panic!("Could not match opcode {}", opcode);
+                panic!("Could not match opcode {}", byte);
                 Self::NOP
             },
 

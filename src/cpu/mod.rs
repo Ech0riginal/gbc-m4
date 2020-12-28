@@ -7,6 +7,7 @@ mod inner;
 
 use core::ops::Sub;
 use inner::*;
+use core::ptr::read;
 
 // CPU flag positionsz
 const ZERO_FLAG_BYTE_POSITION: u8 = 7;
@@ -179,8 +180,7 @@ impl CPU {
     pub unsafe fn execute(&mut self, inst: Instruction) {
         match inst {
             // super handy - https://meganesulli.com/generate-gb-opcodes/
-            // TODO docs on each instruction - shit's so disparate, get insight from megan?
-            Instruction::ADD(reg) => {
+            Instruction::ADD(reg) if !reg.is_virtual() => {
                 let regi = self.getreg(reg);
                 let (nv, did_overflow) = self.a.overflowing_add(*regi);
 
@@ -207,9 +207,13 @@ impl CPU {
                 );
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::ADC(reg) => {
+            Instruction::ADC(flag, reg) => {
                 let regi = self.getreg(reg);
-                let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
+                let c = if flag == Flag::CY {
+                    if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 }
+                } else {
+                    0
+                };
 
                 self.a = (self.a + *regi + c) as u8;
 
@@ -221,7 +225,7 @@ impl CPU {
                 );
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SUB(reg) => {
+            Instruction::SUB(reg) if !reg.is_virtual() => {
                 let regi = self.getreg(reg);
                 let r  = self.a.wrapping_sub(*regi);
                 let c = (self.a ^ *regi ^ r) as u16;
@@ -235,8 +239,25 @@ impl CPU {
                     (c & 0x0010) != 0,
 
                 )
-            }
-            Instruction::SBC(reg) => {
+            },
+            // Virtual SUB
+            Instruction::SUB(reg) => {
+                let hl = *(self.getreg(reg) as *const u16);
+                let v = self.read(hl);
+                let r  = self.a.wrapping_sub(v);
+                let c = (self.a ^ v ^ r) as u16;
+
+                self.a = r;
+
+                self.set_flags(
+                    self.a == 0,
+                    true,
+                    (c & 0x0010) != 0,
+                    (c & 0x0010) != 0,
+
+                )
+            },
+            Instruction::SBC(_flag, reg) => {
                 let regi = self.getreg(reg);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
@@ -251,18 +272,18 @@ impl CPU {
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::AND(reg) => {
-                self.a = self.a & *self.getreg(reg);
+                self.a = self.a & *self.getreg(reg); // TODO what's _actually_ gonna happen once we try to load HL into here
                 self.set_flags(self.a == 0, false, true, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::OR(_reg) => { unimplemented!() }
             Instruction::XOR(_reg) => { unimplemented!() }
-            Instruction::CP => { unimplemented!() }
-            Instruction::JP => { unimplemented!() }
-            Instruction::JR => { unimplemented!() }
+            Instruction::CP(_reg) => { unimplemented!() }
+            Instruction::JP(_flag, _reg) => { unimplemented!() }
+            Instruction::JR(_flag, _reg) => { unimplemented!() }
+            Instruction::INC(_reg) if !_reg.is_virtual() => { unimplemented!() }
             Instruction::INC(_reg) => { unimplemented!() }
-            Instruction::INC(_reg) => { unimplemented!() }
-            Instruction::DEC(_reg) => { unimplemented!() }
+            Instruction::DEC(_reg) if !_reg.is_virtual() => { unimplemented!() }
             Instruction::DEC(_reg) => { unimplemented!() }
             Instruction::CCF => { unimplemented!() }
             Instruction::SCF => {
@@ -289,6 +310,7 @@ impl CPU {
                 let r = self.getreg(reg);
                 *r = *r | !(0x01 << bit);
             }
+            Instruction::NOP => { unimplemented!() }
             Instruction::SRL => { unimplemented!() }
             Instruction::RR => { unimplemented!() }
             Instruction::RL => { unimplemented!() }
@@ -302,20 +324,36 @@ impl CPU {
                 *self.getreg(reg) <<= 1;
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SWAP(reg) => {
+            Instruction::SWAP(reg) if !reg.is_virtual() => {
                 let r = self.getreg(reg);
                 *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
 
                 self.set_flags(*r == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
-            }
+            },
             Instruction::SWAP(reg) => {
-                let r = self.getreg(reg) as *mut u16;
-                *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8); // TODO test this
+                let r = self.getreg(reg);
+                *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8);
 
                 self.set_flags(*r == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
+            Instruction::CALL(_, _) => { unimplemented!() }
+            Instruction::DAA => { unimplemented!() }
+            Instruction::LD(_, _, _) => { unimplemented!() }
+            Instruction::LDR(_, _) => { unimplemented!() }
+            Instruction::LDSP => { unimplemented!() }
+            Instruction::RLCA => { unimplemented!() }
+            Instruction::HCF => { unimplemented!() }
+            Instruction::POP(_) => { unimplemented!() }
+            Instruction::PUSH(_) => { unimplemented!() }
+            Instruction::STOP => { unimplemented!() }
+            Instruction::RST(_) => { unimplemented!() }
+            Instruction::RET(_) => { unimplemented!() }
+            Instruction::RETI => { unimplemented!() }
+            Instruction::EI => { unimplemented!() }
+            Instruction::DI => { unimplemented!() }
+            Instruction::CB_INSTRUCTION => { unimplemented!() }
         }
     }
 
@@ -355,11 +393,16 @@ impl CPU {
             Register::F => &mut self.flag,
             Register::H => &mut self.h,
             Register::L => &mut self.l,
+            Register::D8 => &mut self.pc.to_be_bytes()[0],
             // Virtual registers
             Register::AF => &mut self.a,
             Register::BC => &mut self.b,
             Register::DE => &mut self.d,
             Register::HL => &mut self.h,
+            Register::HLi => &mut self.h,
+            Register::HLd => &mut self.h,
+            Register::SP => &mut self.sp.to_be_bytes()[0],
+            Register::D16 => &mut self.pc.to_be_bytes()[0],
         }
     }
 }
