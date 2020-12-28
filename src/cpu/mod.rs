@@ -281,8 +281,13 @@ impl CPU {
                 }
             }
             Instruction::SET(bit, reg) => {
-                let r = self.getreg(reg);
-                let r = *r | !(0x01 << bit);
+                if reg.is_virtual() {
+                    let r = self.getreg(reg);
+                    *r = *r | !(0x01 << bit);
+                } else {
+                    let r = self.getreg(reg) as *mut u16;
+                    *r = *r | !(0x01 << bit);
+                }
             }
             Instruction::NOP => { unimplemented!() }
             Instruction::SRL => { unimplemented!() }
