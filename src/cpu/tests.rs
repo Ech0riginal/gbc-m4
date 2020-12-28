@@ -49,7 +49,7 @@ fn test_add_8() {
 
     unsafe {
         for _i in 0..2 {
-            cpu.execute(Instruction::ADD8(Register::D));
+            cpu.execute(Instruction::ADD(Register::D));
         }
     }
 

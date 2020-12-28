@@ -180,7 +180,7 @@ impl CPU {
         match inst {
             // super handy - https://meganesulli.com/generate-gb-opcodes/
             // TODO docs on each instruction - shit's so disparate, get insight from megan?
-            Instruction::ADD8(reg) => {
+            Instruction::ADD(reg) => {
                 let regi = self.getreg(reg);
                 let (nv, did_overflow) = self.a.overflowing_add(*regi);
 
@@ -192,7 +192,7 @@ impl CPU {
                 self.a = nv;
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::ADD16(reg) => {
+            Instruction::ADD(reg) => {
                 let a = *self.getreg(reg) as u16;
                 let hl = self.getreg(Register::HL) as *mut u16;
                 // luckily, this will lock us to 16 bits
