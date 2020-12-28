@@ -192,13 +192,9 @@ impl CPU {
                 self.a = nv;
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::ADC(flag, reg) => {
+            Instruction::ADC(reg) => {
                 let v = self.read_reg(reg);
-
-                let c = match flag {
-                    Flag::CY => if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 },
-                    _ => 0,
-                };
+                let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
                 self.a = (self.a + v + c);
 
@@ -254,7 +250,16 @@ impl CPU {
                 self.set_flags(self.a == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::CP(_reg) => { unimplemented!() }
+            Instruction::CP(reg) => {
+                let a = self.a;
+                let v = self.read_reg(reg);
+                self.set_flags(
+                    a == v,
+                    true,
+                    (a.wrapping_sub(value) & 0xf) > (a & 0xf),
+                    a < v
+                );
+            }
             Instruction::JP(_flag, _reg) => { unimplemented!() }
             Instruction::JR(_flag, _reg) => { unimplemented!() }
             Instruction::INC(_reg) if !_reg.is_virtual() => { unimplemented!() }

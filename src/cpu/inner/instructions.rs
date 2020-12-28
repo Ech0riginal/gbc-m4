@@ -17,7 +17,7 @@ pub enum Instruction {
     /// Add the contents of `Register` and the CY flag to the contents of register A, and store the
     /// results in register A. If the HL register is passed, ADC will read from memory at the address
     /// specified in HL and add that value to the value of A, and store the result in register A.
-    ADC(Flag, Register),
+    ADC(Register),
     /// Subtract the contents of `Register` from the contents of register A, and store the results
     /// in register A. If the HL register is passed, SUB will read from memory at the address
     /// specified in HL and subtract that value from A, and store the result in register A.
@@ -262,14 +262,14 @@ impl Instruction {
             0x85 => Self::ADD(L),
             0x86 => Self::ADD(HL),
             0x87 => Self::ADD(A),
-            0x88 => Self::ADC(CY, B),
-            0x89 => Self::ADC(CY, C),
-            0x8A => Self::ADC(CY, D),
-            0x8B => Self::ADC(CY, E),
-            0x8C => Self::ADC(CY, H),
-            0x8D => Self::ADC(CY, L),
-            0x8E => Self::ADC(CY, HL),
-            0x8F => Self::ADC(CY, A),
+            0x88 => Self::ADC(B),
+            0x89 => Self::ADC(C),
+            0x8A => Self::ADC(D),
+            0x8B => Self::ADC(E),
+            0x8C => Self::ADC(H),
+            0x8D => Self::ADC(L),
+            0x8E => Self::ADC(HL),
+            0x8F => Self::ADC(A),
             0x90 => Self::SUB(B),
             0x91 => Self::SUB(C),
             0x92 => Self::SUB(D),
@@ -332,7 +332,7 @@ impl Instruction {
             0xCB => Self::CB_INSTRUCTION, // TODO CB_INSTRUCTION handler
             0xCC => Self::CALL(NZ, D16),
             0xCD => Self::CALL(NF, D16),
-            0xCE => Self::ADC(CY, D8),
+            0xCE => Self::ADC(D8),
             0xCF => Self::RST(0x08),
             0xD0 => Self::RET(NC),
             0xD1 => Self::POP(DE),
