@@ -40,3 +40,29 @@ impl Flagd for FlagRegister {
         }
     }
 }
+
+/// The GBC's opcodes often imply behavior we define herein, pulled from @meganesu's work.
+pub enum Flag {
+    /// NOP, but for Flags
+    NF,
+    /// When we need to store a value at a memory location specified by a 16-bit register
+    STR,
+    /// When we need to grab the value specified by a 16-bit register into the 8-bit accumulator
+    GRB,
+    /// Zero flag
+    Z,
+    /// Not-zero flag
+    NZ,
+    /// Subtract flag
+    S,
+    /// Carry flag
+    CY,
+    /// Not-carry flag
+    NC,
+    /// Half-carry flag
+    HCY,
+    /// Tells the cpu that the registers given contain the value and the address to store to RAM
+    RAM,
+    /// Tells the cpu that the registers given contain the value and the address to store to VRAM
+    VRAM,
+}

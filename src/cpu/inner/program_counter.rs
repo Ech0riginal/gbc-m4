@@ -1,3 +1,6 @@
+use super::{Src, Dst};
+use crate::cpu::CPU;
+
 pub type ProgramCounter = u16;
 
 pub trait Countd {
@@ -24,3 +27,14 @@ impl Countd for ProgramCounter {
     }
 }
 
+impl Dst<u8> for ProgramCounter {
+    unsafe fn write(&self, cpu: &mut CPU, val: u8) {
+        cpu.write_mem(*self, val);
+    }
+}
+
+impl Src<u8> for ProgramCounter {
+    unsafe fn read(&self, cpu: &mut CPU) -> u8 {
+        cpu.read_mem(*self)
+    }
+}

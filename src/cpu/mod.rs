@@ -2,14 +2,12 @@
 
 #[cfg(test)]
 mod tests;
-
 mod inner;
 
-use core::ops::Sub;
 use inner::*;
-use core::ptr::read;
+use inner::Register::{A, HL};
 
-// CPU flag positionsz
+// CPU flag positions
 const ZERO_FLAG_BYTE_POSITION: u8 = 7;
 const SUBTRACT_FLAG_BYTE_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BYTE_POSITION: u8 = 5;
@@ -22,23 +20,19 @@ const VRAM_SIZE: usize = 0x7F;
 // https://github.com/nekronos/gbc_rs/blob/master/src/gbc/interconnect.rs
 
 #[repr(C)]
+// The order of these fields does matter, and tbh this may not work on any other chip or compiler
 pub(crate) struct CPU {
-    /// Accumulator register
-    a: u8,
     /// CPU flag register, see inner/flag_register.rs
     flag: u8,
-    // 0 0 0 0 - trailing nibble isn't used
-    // | | | carry
-    // | | half carry
-    // | subtraction
-    // zero
+    /// Accumulator register
+    a: u8,
     /// Registers
-    b: u8,
     c: u8,
-    d: u8,
+    b: u8,
     e: u8,
-    h: u8,
+    d: u8,
     l: u8,
+    h: u8,
     halted: bool,
     /// Program counter
     pc: u16,
@@ -97,17 +91,25 @@ impl CPU {
             }
         };
 
+        // self.pc.wrapping_add(1);
+
         Instruction::from_memory(prefixed, byte)
     }
 
-    fn read(&self, addr: u16) -> u8 {
+    /*
+        0xFF00-0xFF7F: Port/Mode registers, control register, sound register
+        0xFF80-0xFFFE: Working & Stack RAM (127 bytes)
+        0xFFFF: Interrupt Enable Register
+     */
+
+    fn read_mem(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7fff => unimplemented!("{}", addr),
             0x8000..=0x9fff => unimplemented!("{}", addr),
             0xa000..=0xbfff => unimplemented!("{}", addr),
             0xc000..=0xcfff => unimplemented!("{}", addr),
             0xd000..=0xdfff => unimplemented!("{}", addr),
-            0xe000..=0xfdff => self.read(addr - 0xE000 + 0xC000),
+            0xe000..=0xfdff => self.read_mem(addr - 0xE000 + 0xC000),
 
             0xff00 => unimplemented!("{}", addr),
 
@@ -135,14 +137,14 @@ impl CPU {
         }
     }
 
-    fn write(&mut self, addr: u16, val: u8) {
+    fn write_mem(&mut self, addr: u16, val: u8) {
         match addr {
             0x0000..=0x7fff => unimplemented!("{}", addr),
             0x8000..=0x9fff => unimplemented!("{}", addr),
             0xa000..=0xbfff => unimplemented!("{}", addr),
             0xc000..=0xcfff => self.ram[(addr - 0xC000) as usize] = val,
             0xd000..=0xdfff => self.ram[(addr - 0xC000) as usize + self.ram_offset] = val,
-            0xe000..=0xfdff => self.write(addr - 0xE000 + 0xC000, val),
+            0xe000..=0xfdff => self.write_mem(addr - 0xE000 + 0xC000, val),
 
             0xff00 => unimplemented!("{} {}", addr, val),
 
@@ -181,22 +183,23 @@ impl CPU {
         match inst {
             // super handy - https://meganesulli.com/generate-gb-opcodes/
             Instruction::ADD(reg) => {
-                let v = self.read_reg(reg);
-                let (nv, did_overflow) = self.a.overflowing_add(v);
+                let v = reg.read(self);
+                let av: u8 = A.read(self);
+                let (nv, did_overflow) = av.overflowing_add(v);
 
                 self.flag.zero(nv == 0);
                 self.flag.subtract(false);
                 self.flag.carry(did_overflow);
                 self.flag.half_carry((v & 0xF) + (nv & 0xF) > 0xF);
 
-                self.a = nv;
+                A.write(self, nv);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::ADC(reg) => {
-                let v = self.read_reg(reg);
+                let v = reg.read(self);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
-                self.a = (self.a + v + c);
+                A.write(self, self.a + v + c);
 
                 self.set_flags(
                     self.a == 0,
@@ -207,7 +210,7 @@ impl CPU {
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::SUB(reg) => {
-                let v = self.read_reg(reg);
+                let v = reg.read(self);
                 let r  = self.a.wrapping_sub(v);
                 let c = (self.a ^ v ^ r) as u16;
 
@@ -222,44 +225,69 @@ impl CPU {
                 )
             },
             Instruction::SBC(reg) => {
-                let regi = self.getreg(reg);
+                let v = reg.read(self);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
-                self.a = self.a.wrapping_sub(*regi).wrapping_sub(c);
+                self.a = self.a.wrapping_sub(v).wrapping_sub(c);
 
                 self.set_flags(
                     self.a == 0,
                     true,
                     self.a < 0,
-                    ((self.a & 0x0F) - (*regi & 0x0F) - c) < 0,
+                    ((self.a & 0x0F) - (v & 0x0F) - c) < 0,
                 );
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::AND(reg) => {
-                self.a = self.a & self.read_reg(reg);
+                self.a = self.a & reg.read(self);
                 self.set_flags(self.a == 0, false, true, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::OR(reg) => {
-                self.a = self.a | self.read_reg(reg);
+                self.a = self.a | reg.read(self);
                 self.set_flags(self.a == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::XOR(reg) => {
-                self.a = self.a ^ self.read_reg(reg);
+                self.a = self.a ^ reg.read(self);
                 self.set_flags(self.a == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::CP(reg) => {
-                let a = self.a;
-                let v = self.read_reg(reg);
+                let a = A.read(self);
+                let v = reg.read(self);
                 self.set_flags(
                     a == v,
                     true,
-                    (a.wrapping_sub(value) & 0xf) > (a & 0xf),
+                    (a.wrapping_sub(v) & 0xf) > (a & 0xf),
                     a < v
                 );
             }
+            Instruction::BIT(bit, reg) => {
+                let v = reg.read(self) >> bit;
+                self.flag.zero((v & 0x01) == 0);
+                self.flag.subtract(false);
+                self.flag.half_carry(true);
+            }
+            Instruction::RES(bit, reg) => {
+                if reg.is_virtual() {
+                    let r = self.addr(&reg) as *mut u16;
+                    *r = *r & !(0x01 << bit);
+                } else {
+                    let r = self.addr(&reg);
+                    *r = *r & !(0x01 << bit);
+                }
+            }
+            Instruction::SET(bit, reg) => {
+                if reg.is_virtual() {
+                    let r = self.addr(&reg);
+                    *r = *r | !(0x01 << bit);
+                } else {
+                    let r = self.addr(&reg) as *mut u16;
+                    *r = *r | !(0x01 << bit);
+                }
+            }
+
             Instruction::JP(_flag, _reg) => { unimplemented!() }
             Instruction::JR(_flag, _reg) => { unimplemented!() }
             Instruction::INC(_reg) if !_reg.is_virtual() => { unimplemented!() }
@@ -276,61 +304,37 @@ impl CPU {
             Instruction::RRCA => { unimplemented!() }
             Instruction::RRLA => { unimplemented!() }
             Instruction::CPL => { unimplemented!() }
-            Instruction::BIT(bit, reg) => {
-                let v = self.read_reg(reg);
-
-                self.flag.zero(((v >> bit) & 0x01) == 0);
-                self.flag.subtract(false);
-                self.flag.half_carry(true);
-            }
-            Instruction::RES(bit, reg) => {
-                if reg.is_virtual() {
-                    let r = self.getreg(reg) as *mut u16;
-                    *r = *r & !(0x01 << bit);
-                } else {
-                    let r = self.getreg(reg);
-                    *r = *r & !(0x01 << bit);
-                }
-            }
-            Instruction::SET(bit, reg) => {
-                if reg.is_virtual() {
-                    let r = self.getreg(reg);
-                    *r = *r | !(0x01 << bit);
-                } else {
-                    let r = self.getreg(reg) as *mut u16;
-                    *r = *r | !(0x01 << bit);
-                }
-            }
             Instruction::NOP => { unimplemented!() }
             Instruction::SRL => { unimplemented!() }
             Instruction::RR => { unimplemented!() }
             Instruction::RL => { unimplemented!() }
             Instruction::RRC => { unimplemented!() }
-            Instruction::RLC => { unimplemented!() }
+            Instruction::RLC(reg) => {
+                let v = reg.read(self);
+                let r = v.rotate_left(1);
+                self.set_flags(r == 0, false, false, (v & 0x80) != 0);
+                reg.write(self, r);
+            }
             Instruction::SRA(reg) => {
-                if reg.is_virtual() {
-                    *(self.getreg(reg) as *mut u16) >>= 1;
-                } else {
-                    *self.getreg(reg) >>= 1
-                }
-
+                let v = reg.read(self) >> 1;
+                reg.write(self, v);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::SLA(reg) => {
                 if reg.is_virtual() {
-                    *(self.getreg(reg) as *mut u16) <<= 1;
+                    *(self.vaddr(&reg)) <<= 1;
                 } else {
-                    *self.getreg(reg) <<= 1
+                    *self.addr(&reg) <<= 1
                 }
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::SWAP(reg) => {
                 let v = if reg.is_virtual() {
-                    let r = self.getreg(reg) as *mut u16;
+                    let r = self.addr(&reg) as *mut u16;
                     *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8);
                     *r
                 } else {
-                    let r = self.getreg(reg);
+                    let r = self.addr(&reg);
                     *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
                     *r as u16
                 };
@@ -340,10 +344,43 @@ impl CPU {
             },
             Instruction::CALL(_, _) => { unimplemented!() }
             Instruction::DAA => { unimplemented!() }
-            Instruction::LD(_, _, _) => { unimplemented!() }
+            Instruction::LD(flag, dst, src) => {
+                match flag {
+                    // Simple load value in or specified at src into dst
+                    Flag::NF => {
+                        let v = src.read(self);
+                        dst.write(self, v);
+                    }
+                    Flag::STR => {
+                        if dst.is_virtual() {
+
+                        }
+                    }
+                    // Load the value specified by register src into the accumulator
+                    Flag::GRB => {
+                        let v = src.read(self);
+                        A.write(self, v);
+                    }
+                    Flag::Z => {}
+                    Flag::NZ => {}
+                    Flag::S => {}
+                    Flag::CY => {}
+                    Flag::NC => {}
+                    Flag::HCY => {}
+                    Flag::RAM => {}
+                    Flag::VRAM => {}
+                }
+            }
             Instruction::LDR(_, _) => { unimplemented!() }
-            Instruction::LDSP => { unimplemented!() }
-            Instruction::RLCA => { unimplemented!() }
+            Instruction::LDSP => {
+
+
+            }
+            Instruction::RLCA => {
+                self.execute(Instruction::RLC(A));
+                self.flag.zero(false);
+
+            }
             Instruction::HCF => { unimplemented!() }
             Instruction::POP(_) => { unimplemented!() }
             Instruction::PUSH(_) => { unimplemented!() }
@@ -366,13 +403,13 @@ impl CPU {
         self.flag.carry(carry);
     }
 
-    /// Simple wrapper around `read` and `getreg` for reading values off Registers
-    unsafe fn read_reg(&mut self, reg: Register) -> u8 {
+    /// Simple wrapper around `read_mem` and `addr` for reading values off Registers
+    unsafe fn read<R: Dst<u8> + Src<u8>>(&mut self, reg: &R) -> u8 {
         if reg.is_virtual() {
-            let addr = *(self.getreg(reg) as *const u16);
-            self.read(addr)
+            let addr = *(self.addr(&reg) as *const u16);
+            self.read_mem(addr)
         } else {
-            *self.getreg(reg)
+            *self.addr(&reg)
         }
     }
 
@@ -385,14 +422,14 @@ impl CPU {
     /// use cpu::{CPU, Register};
     ///
     /// let mut cpu = CPU::new();
-    /// let mut hl_regi = cpu.get(Register::HL) as *mut u16;
+    /// let mut hl_regi = cpu.addr(Register::HL) as *mut u16;
     ///
     /// *hl_regi = 0b0000_0001_1010_0100;
     ///
-    /// assert_eq!(*cpu.getreg(Register::H), 0b1010_0100);
-    /// assert_eq!(*cpu.getreg(Register::L), 0b0000_0001);
+    /// assert_eq!(*cpu.addr(Register::H), 0b1010_0100);
+    /// assert_eq!(*cpu.addr(Register::L), 0b0000_0001);
     /// ```
-    pub(crate) fn getreg(&mut self, r: Register) -> *mut u8 {
+    fn addr(&mut self, r: &Register) -> *mut u8 {
         match r {
             // Registers
             Register::A => &mut self.a,
@@ -405,14 +442,31 @@ impl CPU {
             Register::L => &mut self.l,
             Register::D8 => &mut self.pc.to_be_bytes()[0],
             // Virtual registers
-            Register::AF => &mut self.a,
-            Register::BC => &mut self.b,
-            Register::DE => &mut self.d,
-            Register::HL => &mut self.h,
-            Register::HLi => &mut self.h,
-            Register::HLd => &mut self.h,
+            Register::AF => &mut self.flag,
+            Register::BC => &mut self.c,
+            Register::DE => &mut self.e,
+            Register::HL => &mut self.l,
+            Register::HLi => &mut self.l,
+            Register::HLd => &mut self.l,
             Register::SP => &mut self.sp.to_be_bytes()[0],
             Register::D16 => &mut self.pc.to_be_bytes()[0],
         }
     }
+
+    fn vaddr(&mut self, r: &Register) -> *mut u16 {
+        match r {
+            Register::AF => (&mut self.f as *mut u8) as *mut u16,
+            Register::BC => (&mut self.c as *mut u8) as *mut u16,
+            Register::DE => (&mut self.e as *mut u8) as *mut u16,
+            Register::HL => (&mut self.l as *mut u8) as *mut u16,
+            Register::HLi => (&mut self.l as *mut u8) as *mut u16,
+            Register::HLd => (&mut self.l as *mut u8) as *mut u16,
+            Register::SP => &mut self.sp,
+            Register::D16 => &mut self.pc,
+            _ => {
+                panic!("Invalid call to vAddr");
+            }
+        }
+    }
+
 }
