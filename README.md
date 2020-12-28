@@ -9,7 +9,6 @@ if you would like to use this source for your own projects,
 please reference the Creative Commons BeerWare license
 * if you become upset at some of the stupid things i do here, im sorry you feel that way
 
-
 handy resources:
 
 The Ultimate GameBoy Talk - https://www.youtube.com/watch?v=HyzD8pNlpwI
@@ -26,3 +25,7 @@ ItsyBitsy M4:
 * 2 MB SPI FLASH chip for storing files and CircuitPython code storage.
 
 relevant documentation on the ATSAMD51G19A can be found in atsamd/boards/itsybitsy_m4
+
+# Special thanks
+* to @nekronos for his tight Dst, Src, Mem impl located [here](https://github.com/nekronos/gbc_rs/blob/37146d6d1ebd8b14390284ac44d3f355d0e4938a/src/gbc/cpu.rs#L54)
+* to @meganesu for her [awesome opcode viewer](https://meganesulli.com/generate-gb-opcodes/)
