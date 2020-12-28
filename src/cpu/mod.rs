@@ -38,6 +38,7 @@ pub(crate) struct CPU {
     e: u8,
     h: u8,
     l: u8,
+    halted: bool,
     /// Program counter
     pc: u16,
     /// Stack pointer, see inner/program_counter.rs
@@ -64,6 +65,7 @@ impl CPU {
             e: 0x56,
             h: 0x00,
             l: 0x0D,
+            halted: false,
             pc: 0,
             sp: 0,
             svbk: 0,
@@ -79,12 +81,12 @@ impl CPU {
 
     // Sue me
     pub unsafe fn cycle(&mut self) {
-        let inst = self.get_instruction();
+        let inst = self.step();
 
         self.execute(inst);
     }
 
-    fn get_instruction(&mut self) -> Instruction {
+    fn step(&mut self) -> Instruction {
         let (byte, prefixed) = {
             let tmp = self.bus.read_byte(self.pc);
             if tmp == 0xCB {
@@ -95,23 +97,6 @@ impl CPU {
         };
 
         Instruction::from_memory(prefixed, byte)
-    }
-
-    /// Loads the first byte of immediate data in the program counter and increments
-    /// the program counter before returning the value.
-    fn d8(&mut self) -> u8 {
-        let pc = self.pc;
-        let value = self.read(pc);
-        self.pc = self.pc.wrapping_add(1);
-        value
-    }
-
-    /// Loads the first two bytes of immediate data in the program counter
-    /// and increments the counter before returning the value.
-    fn d16(&mut self) -> u16 {
-        let low = self.d8() as u16;
-        let high = self.d8() as u16;
-        (high << 8) | low
     }
 
     fn read(&self, addr: u16) -> u8 {

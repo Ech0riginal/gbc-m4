@@ -1,6 +1,6 @@
 pub type ProgramCounter = u16;
 
-trait Countd {
+pub trait Countd {
     fn d8(&mut self) -> u8;
     fn d16(&mut self) -> u16;
 }
