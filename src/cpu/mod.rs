@@ -296,11 +296,20 @@ impl CPU {
             Instruction::RRC => { unimplemented!() }
             Instruction::RLC => { unimplemented!() }
             Instruction::SRA(reg) => {
-                *self.getreg(reg) >>= 1;
+                if reg.is_virtual() {
+                    *(self.getreg(reg) as *mut u16) >>= 1;
+                } else {
+                    *self.getreg(reg) >>= 1
+                }
+
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::SLA(reg) => {
-                *self.getreg(reg) <<= 1;
+                if reg.is_virtual() {
+                    *(self.getreg(reg) as *mut u16) <<= 1;
+                } else {
+                    *self.getreg(reg) <<= 1
+                }
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::SWAP(reg) if !reg.is_virtual() => {
