@@ -260,10 +260,10 @@ impl CPU {
             Instruction::CP => { unimplemented!() }
             Instruction::JP => { unimplemented!() }
             Instruction::JR => { unimplemented!() }
-            Instruction::INC8(_reg) => { unimplemented!() }
-            Instruction::INC16(_reg) => { unimplemented!() }
-            Instruction::DEC8(_reg) => { unimplemented!() }
-            Instruction::DEC16(_reg) => { unimplemented!() }
+            Instruction::INC(_reg) => { unimplemented!() }
+            Instruction::INC(_reg) => { unimplemented!() }
+            Instruction::DEC(_reg) => { unimplemented!() }
+            Instruction::DEC(_reg) => { unimplemented!() }
             Instruction::CCF => { unimplemented!() }
             Instruction::SCF => {
                 self.flag.carry(true);
@@ -302,14 +302,14 @@ impl CPU {
                 *self.getreg(reg) <<= 1;
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SWAP8(reg) => {
+            Instruction::SWAP(reg) => {
                 let r = self.getreg(reg);
                 *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
 
                 self.set_flags(*r == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SWAP16(reg) => {
+            Instruction::SWAP(reg) => {
                 let r = self.getreg(reg) as *mut u16;
                 *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8); // TODO test this
 
