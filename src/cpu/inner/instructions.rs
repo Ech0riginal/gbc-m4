@@ -14,7 +14,9 @@ pub enum Instruction {
     /// ADDs either the value of an 8-bit register to A, our 8-bit accumulator,
     /// or ADDs the value of a 16-bit register to HL, our 16-bit accumulator
     ADD(Register),
-    // TODO ADC DOC
+    /// Add the contents of `Register` and the CY flag to the contents of register A, and store the
+    /// results in register A. If the HL register is passed, ADC will read from memory at the address
+    /// specified in HL and add that value to the value of A, and store the result in register A.
     ADC(Flag, Register),
     /// Subtract the contents of `Register` from the contents of register A, and store the results
     /// in register A. If the HL register is passed, SUB will read from memory at the address
@@ -267,7 +269,7 @@ impl Instruction {
             0x8C => Self::ADC(CY, H),
             0x8D => Self::ADC(CY, L),
             0x8E => Self::ADC(CY, HL),
-            0x8F => Self::ADC(NF, A),
+            0x8F => Self::ADC(CY, A),
             0x90 => Self::SUB(B),
             0x91 => Self::SUB(C),
             0x92 => Self::SUB(D),
