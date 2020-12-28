@@ -100,6 +100,12 @@ impl CPU {
         Instruction::from_memory(prefixed, byte)
     }
 
+    /// Simple wrapper around `read` for reading addresses off the 16-bit registers
+    unsafe fn read_vr(&mut self, reg: Register) -> u8 {
+        let addr = *(self.getreg(reg) as *const u16);
+        self.read(addr)
+    }
+
     fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7fff => unimplemented!("{}", addr),
@@ -208,14 +214,19 @@ impl CPU {
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::ADC(flag, reg) => {
-                let regi = self.getreg(reg);
+                let v = if reg.is_virtual() {
+                    self.read_vr(reg)
+                } else {
+                    *self.getreg(reg)
+                };
+
                 let c = if flag == Flag::CY {
                     if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 }
                 } else {
                     0
                 };
 
-                self.a = (self.a + *regi + c) as u8;
+                self.a = (self.a + v + c);
 
                 self.set_flags(
                     self.a == 0,
@@ -240,7 +251,6 @@ impl CPU {
 
                 )
             },
-            // Virtual SUB
             Instruction::SUB(reg) => {
                 let hl = *(self.getreg(reg) as *const u16);
                 let v = self.read(hl);
