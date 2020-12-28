@@ -100,12 +100,6 @@ impl CPU {
         Instruction::from_memory(prefixed, byte)
     }
 
-    /// Simple wrapper around `read` for reading addresses off the 16-bit registers
-    unsafe fn read_vr(&mut self, reg: Register) -> u8 {
-        let addr = *(self.getreg(reg) as *const u16);
-        self.read(addr)
-    }
-
     fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x7fff => unimplemented!("{}", addr),
@@ -186,39 +180,20 @@ impl CPU {
     pub unsafe fn execute(&mut self, inst: Instruction) {
         match inst {
             // super handy - https://meganesulli.com/generate-gb-opcodes/
-            Instruction::ADD(reg) if !reg.is_virtual() => {
-                let regi = self.getreg(reg);
-                let (nv, did_overflow) = self.a.overflowing_add(*regi);
+            Instruction::ADD(reg) => {
+                let v = self.read_reg(reg);
+                let (nv, did_overflow) = self.a.overflowing_add(v);
 
                 self.flag.zero(nv == 0);
                 self.flag.subtract(false);
                 self.flag.carry(did_overflow);
-                self.flag.half_carry((*regi & 0xF) + (nv & 0xF) > 0xF);
+                self.flag.half_carry((v & 0xF) + (nv & 0xF) > 0xF);
 
                 self.a = nv;
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::ADD(reg) => {
-                let a = *self.getreg(reg) as u16;
-                let hl = self.getreg(Register::HL) as *mut u16;
-                // luckily, this will lock us to 16 bits
-                let (nv, did_overflow) = (*hl).overflowing_add(a);
-                *hl = nv; // TODO due to the Endianness of ARMv7-M & x86, this is bugged.
-
-                self.set_flags(
-                    nv == 0,
-                    false,
-                    did_overflow,
-                    ((*hl ^ a ^ (nv & 0xffff)) & 0x1000) != 0,
-                );
-                let _ = self.pc.wrapping_add(1);
-            }
             Instruction::ADC(flag, reg) => {
-                let v = if reg.is_virtual() {
-                    self.read_vr(reg)
-                } else {
-                    *self.getreg(reg)
-                };
+                let v = self.read_reg(reg);
 
                 let c = if flag == Flag::CY {
                     if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 }
@@ -236,24 +211,8 @@ impl CPU {
                 );
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SUB(reg) if !reg.is_virtual() => {
-                let regi = self.getreg(reg);
-                let r  = self.a.wrapping_sub(*regi);
-                let c = (self.a ^ *regi ^ r) as u16;
-
-                self.a = r;
-
-                self.set_flags(
-                    self.a == 0,
-                    true,
-                    (c & 0x0010) != 0,
-                    (c & 0x0010) != 0,
-
-                )
-            },
             Instruction::SUB(reg) => {
-                let hl = *(self.getreg(reg) as *const u16);
-                let v = self.read(hl);
+                let v = self.read_reg(reg);
                 let r  = self.a.wrapping_sub(v);
                 let c = (self.a ^ v ^ r) as u16;
 
@@ -306,19 +265,24 @@ impl CPU {
             Instruction::RRLA => { unimplemented!() }
             Instruction::CPL => { unimplemented!() }
             Instruction::BIT(bit, reg) => {
-                let r = self.getreg(reg);
+                let v = self.read_reg(reg);
 
-                self.flag.zero(((*r >> bit) & 0x01) == 0);
+                self.flag.zero(((v >> bit) & 0x01) == 0);
                 self.flag.subtract(false);
                 self.flag.half_carry(true);
             }
             Instruction::RES(bit, reg) => {
-                let r = self.getreg(reg);
-                *r = *r & !(0x01 << bit);
+                if reg.is_virtual() {
+                    let r = self.getreg(reg) as *mut u16;
+                    *r = *r & !(0x01 << bit);
+                } else {
+                    let r = self.getreg(reg);
+                    *r = *r & !(0x01 << bit);
+                }
             }
             Instruction::SET(bit, reg) => {
                 let r = self.getreg(reg);
-                *r = *r | !(0x01 << bit);
+                let r = *r | !(0x01 << bit);
             }
             Instruction::NOP => { unimplemented!() }
             Instruction::SRL => { unimplemented!() }
@@ -374,6 +338,16 @@ impl CPU {
         self.flag.subtract(subtract);
         self.flag.half_carry(half_carry);
         self.flag.carry(carry);
+    }
+
+    /// Simple wrapper around `read` and `getreg` for reading values off Registers
+    unsafe fn read_reg(&mut self, reg: Register) -> u8 {
+        if reg.is_virtual() {
+            let addr = *(self.getreg(reg) as *const u16);
+            self.read(addr)
+        } else {
+            *self.getreg(reg)
+        }
     }
 
     /// Returns a pointer to the specified Register, mainly so that we can
