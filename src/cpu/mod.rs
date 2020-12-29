@@ -7,7 +7,6 @@ mod inner;
 use inner::*;
 use inner::Flag::*;
 use inner::Register::*;
-mod instructions;
 use core::marker::PhantomData;
 
 // CPU flag positions
@@ -43,6 +42,7 @@ pub(crate) struct CPU {
     sp: u16,
     svbk: u8,
     ppu_dma: u8,
+    ime: bool,
     int_enable: u8,
     int_flags: u8,
     ram_offset: usize,
@@ -68,6 +68,7 @@ impl CPU {
             sp: 0,
             svbk: 0,
             ppu_dma: 0,
+            ime: false,
             int_enable: 0,
             int_flags: 0,
             ram_offset: 0,
@@ -78,14 +79,15 @@ impl CPU {
     }
 
     // Sue me
-    pub unsafe unsafe fn cycle(&mut self) {
+    pub unsafe fn cycle(&mut self) {
         let (prefixed, byte) = self.step();
 
-        if prefixed {
+        let timing = if prefixed {
             self.execute_cb_instruction(byte)
         } else {
             self.execute_instruction(byte)
-        }
+        };
+
     }
 
     unsafe fn step(&mut self) -> (prefixed, byte) {
@@ -180,65 +182,6 @@ impl CPU {
             0xff80..=0xfffe => self.vram[(addr - 0xFF80) as usize] = val,
             0xffff => self.int_enable = val,
             _ => panic!("Write: addr not in range: 0x{:x} - val: 0x{:x}", addr, val),
-        }
-    }
-
-    /// Just a helper function to get rid of some cruft, only applicable when
-    /// we have to touch every flag.
-    unsafe fn set_flags(&mut self, zero: bool, subtract: bool, half_carry: bool, carry: bool) {
-        self.flag.zero(zero);
-        self.flag.subtract(subtract);
-        self.flag.half_carry(half_carry);
-        self.flag.carry(carry);
-    }
-
-    /// Returns a pointer to the specified Register, mainly so that we can
-    /// use our `Instruction`s to abstract away the virtual registers
-    /// Remember to cast a virtual register's pointer to it's 'length', 16
-    ///
-    /// # Examples
-    /// ```no_run
-    /// use cpu::{CPU, Register8};
-    ///
-    /// let mut cpu = CPU::new();
-    /// let mut regi = cpu.addr(Register8::H);
-    ///
-    /// *regi = 0b1010_0100;
-    ///
-    /// assert_eq!(*cpu.addr(Register8::H), 0b1010_0100);
-    /// ```
-    #[inline]
-    unsafe fn addr(&mut self, r: &Register) -> *mut u8 {
-        match r {
-            Register::D8 => &mut self.pc.to_be_bytes()[0],
-            Register::A => &mut self.a,
-            Register::F => &mut self.flag,
-            Register::B => &mut self.b,
-            Register::C => &mut self.c,
-            Register::D => &mut self.d,
-            Register::E => &mut self.e,
-            Register::H => &mut self.h,
-            Register::L => &mut self.l,
-            _ => {
-                panic!("Invalid call to addr");
-            }
-        }
-    }
-
-    #[inline]
-    unsafe fn vaddr(&mut self, r: &Register) -> *mut u16 {
-        match r {
-            Register::AF => (&mut self.flag as *mut u8) as *mut u16,
-            Register::BC => (&mut self.c as *mut u8) as *mut u16,
-            Register::DE => (&mut self.e as *mut u8) as *mut u16,
-            Register::HL => (&mut self.l as *mut u8) as *mut u16,
-            Register::HLi => (&mut self.l as *mut u8) as *mut u16,
-            Register::HLd => (&mut self.l as *mut u8) as *mut u16,
-            Register::SP => &mut self.sp,
-            Register::D16 => &mut self.pc,
-            _ => {
-                panic!("Invalid call to vaddr");
-            }
         }
     }
 
@@ -814,5 +757,122 @@ impl CPU {
         };
 
         Timing::Cb(CB_OPCODE_TIMES[opcode as usize] as u32)
+    }
+}
+
+impl Flagd for CPU {
+    fn status(&self, f: Flag) -> bool {
+        match f {
+            Flag::NF => true,
+            Flag::Z => self.flag >> 7 == 1,
+            Flag::NZ => self.flag >> 7 == 0,
+            Flag::CY => self.flag >> 5 == 1,
+            Flag::NC => self.flag >> 5 == 0,
+            _ => panic!("Bad status call: {:016b}: {:016b}", cpu.pc, cpu.sp)
+        }
+    }
+
+    fn zero(&mut self, b: bool) {
+        if b {
+            self.flag |= 0b1000_0000
+        } else {
+            self.flag &= 0b0111_1111
+        }
+    }
+
+    fn subtract(&mut self, b: bool) {
+        if b {
+            self.flag |= 0b0100_0000
+        } else {
+            self.flag &= 0b1011_1111
+        }
+    }
+
+    fn half_carry(&mut self, b: bool) {
+        if b {
+            self.flag |= 0b0010_0000
+        } else {
+            self.flag &= 0b1101_1111
+        }
+    }
+
+    fn carry(&mut self, b: bool) {
+        if b {
+            self.flag |= 0b0001_0000
+        } else {
+            self.flag &= 0b1110_1111
+        }
+    }
+
+    fn set_flags(&mut self, zero: bool, subtract: bool, half_carry: bool, carry: bool) {
+        self.flag.zero(zero);
+        self.flag.subtract(subtract);
+        self.flag.half_carry(half_carry);
+        self.flag.carry(carry);
+    }
+}
+
+impl Registerd8 for CPU {
+    /// Returns a pointer to the specified Register, will panic if asked for a non-8-bit register
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use cpu::{CPU, Register8};
+    ///
+    /// let mut cpu = CPU::new();
+    /// let mut regi = cpu.addr(Register::H);
+    ///
+    /// *regi = 0b1010_0100;
+    ///
+    /// assert_eq!(*cpu.addr(Register::H), 0b1010_0100);
+    /// ```
+    #[inline]
+    unsafe fn addr(&mut self, r: &Register) -> *mut u8 {
+        match r {
+            Register::D8 => &mut self.pc.to_be_bytes()[0],
+            Register::A => &mut self.a,
+            Register::F => &mut self.flag,
+            Register::B => &mut self.b,
+            Register::C => &mut self.c,
+            Register::D => &mut self.d,
+            Register::E => &mut self.e,
+            Register::H => &mut self.h,
+            Register::L => &mut self.l,
+            _ => {
+                panic!("Invalid call to addr");
+            }
+        }
+    }
+}
+
+impl Registerd16 for CPU {
+    /// Returns a pointer to the specified Register, will panic if asked for a non-16-bit register
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use cpu::{CPU, Register};
+    ///
+    /// let mut cpu = CPU::new();
+    /// let mut regi = cpu.vaddr(Register::HL);
+    ///
+    /// *regi = 0b0000_0001_1010_0100;
+    ///
+    /// assert_eq!(*cpu.addr(Register::HL), 0b0000_0001_1010_0100);
+    /// ```
+    #[inline]
+    unsafe fn vaddr(&mut self, r: &Register) -> *mut u16 {
+        match r {
+            Register::AF => (&mut self.flag as *mut u8) as *mut u16,
+            Register::BC => (&mut self.c as *mut u8) as *mut u16,
+            Register::DE => (&mut self.e as *mut u8) as *mut u16,
+            Register::HL => (&mut self.l as *mut u8) as *mut u16,
+            Register::HLi => (&mut self.l as *mut u8) as *mut u16,
+            Register::HLd => (&mut self.l as *mut u8) as *mut u16,
+            Register::SP => &mut self.sp,
+            Register::D16 => &mut self.pc,
+            _ => {
+                panic!("Invalid call to vaddr");
+            }
+        }
     }
 }

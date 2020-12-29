@@ -13,6 +13,17 @@ pub trait Registerd {
     fn is_virtual(&self) -> bool;
 }
 
+pub trait Registerd8 {
+    /// A function that returns a pointer to an 8-bit general-purpose register
+    unsafe fn addr(&mut self, r: &Register) -> *mut u8;
+}
+
+pub trait Registerd16 {
+    /// A function that returns a pointer to a 16-bit virtual register
+    unsafe fn vaddr(&mut self, r: &Register) -> *mut u8;
+}
+
+
 /// Wraps a Register so we can recognize it as containing a vram address instead of a value
 pub(crate) struct ZMem<T: Src<u8>>(pub T);
 /// Wraps a Register so we can recognize it as containing a ram  address instead of a value
