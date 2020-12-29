@@ -6,6 +6,8 @@ mod inner;
 
 use inner::*;
 use inner::Register::{A, HL};
+use atsamd_hal::hal::blocking::spi::Write;
+use core::marker::PhantomData;
 
 // CPU flag positions
 const ZERO_FLAG_BYTE_POSITION: u8 = 7;
@@ -81,7 +83,7 @@ impl CPU {
         self.execute(inst);
     }
 
-    fn step(&mut self) -> Instruction {
+    fn step<T, D: Dst<T>, S: Src<T>>(&mut self) -> Instruction<T,D,S> {
         let (byte, prefixed) = {
             let tmp = self.bus.read_byte(self.pc);
             if tmp == 0xCB {
@@ -179,7 +181,7 @@ impl CPU {
         }
     }
 
-    pub unsafe fn execute(&mut self, inst: Instruction) {
+    pub unsafe fn execute<T, D: Dst<T>, S: Src<T>>(&mut self, inst: Instruction<T,D,S>) {
         match inst {
             // super handy - https://meganesulli.com/generate-gb-opcodes/
             Instruction::ADD(reg) => {
@@ -309,13 +311,13 @@ impl CPU {
             Instruction::RR => { unimplemented!() }
             Instruction::RL => { unimplemented!() }
             Instruction::RRC => { unimplemented!() }
-            Instruction::RLC(reg) => {
+            Instruction::RLC(mut reg) => {
                 let v = reg.read(self);
                 let r = v.rotate_left(1);
                 self.set_flags(r == 0, false, false, (v & 0x80) != 0);
                 reg.write(self, r);
             }
-            Instruction::SRA(reg) => {
+            Instruction::SRA(mut reg) => {
                 let v = reg.read(self) >> 1;
                 reg.write(self, v);
                 let _ = self.pc.wrapping_add(1);
@@ -344,32 +346,8 @@ impl CPU {
             },
             Instruction::CALL(_, _) => { unimplemented!() }
             Instruction::DAA => { unimplemented!() }
-            Instruction::LD(flag, dst, src) => {
-                match flag {
-                    // Simple load value in or specified at src into dst
-                    Flag::NF => {
-                        let v = src.read(self);
-                        dst.write(self, v);
-                    }
-                    Flag::STR => {
-                        if dst.is_virtual() {
+            Instruction::LD(dst, src) => {
 
-                        }
-                    }
-                    // Load the value specified by register src into the accumulator
-                    Flag::GRB => {
-                        let v = src.read(self);
-                        A.write(self, v);
-                    }
-                    Flag::Z => {}
-                    Flag::NZ => {}
-                    Flag::S => {}
-                    Flag::CY => {}
-                    Flag::NC => {}
-                    Flag::HCY => {}
-                    Flag::RAM => {}
-                    Flag::VRAM => {}
-                }
             }
             Instruction::LDR(_, _) => { unimplemented!() }
             Instruction::LDSP => {
@@ -419,43 +397,35 @@ impl CPU {
     ///
     /// # Examples
     /// ```no_run
-    /// use cpu::{CPU, Register};
+    /// use cpu::{CPU, Register8};
     ///
     /// let mut cpu = CPU::new();
-    /// let mut hl_regi = cpu.addr(Register::HL) as *mut u16;
+    /// let mut regi = cpu.addr(Register8::H);
     ///
-    /// *hl_regi = 0b0000_0001_1010_0100;
+    /// *regi = 0b1010_0100;
     ///
-    /// assert_eq!(*cpu.addr(Register::H), 0b1010_0100);
-    /// assert_eq!(*cpu.addr(Register::L), 0b0000_0001);
+    /// assert_eq!(*cpu.addr(Register8::H), 0b1010_0100);
     /// ```
     fn addr(&mut self, r: &Register) -> *mut u8 {
         match r {
-            // Registers
+            Register::D8 => &mut self.pc.to_be_bytes()[0],
             Register::A => &mut self.a,
+            Register::F => &mut self.flag,
             Register::B => &mut self.b,
             Register::C => &mut self.c,
             Register::D => &mut self.d,
             Register::E => &mut self.e,
-            Register::F => &mut self.flag,
             Register::H => &mut self.h,
             Register::L => &mut self.l,
-            Register::D8 => &mut self.pc.to_be_bytes()[0],
-            // Virtual registers
-            Register::AF => &mut self.flag,
-            Register::BC => &mut self.c,
-            Register::DE => &mut self.e,
-            Register::HL => &mut self.l,
-            Register::HLi => &mut self.l,
-            Register::HLd => &mut self.l,
-            Register::SP => &mut self.sp.to_be_bytes()[0],
-            Register::D16 => &mut self.pc.to_be_bytes()[0],
+            _ => {
+                panic!("Invalid call to addr");
+            }
         }
     }
 
     fn vaddr(&mut self, r: &Register) -> *mut u16 {
         match r {
-            Register::AF => (&mut self.f as *mut u8) as *mut u16,
+            Register::AF => (&mut self.flag as *mut u8) as *mut u16,
             Register::BC => (&mut self.c as *mut u8) as *mut u16,
             Register::DE => (&mut self.e as *mut u8) as *mut u16,
             Register::HL => (&mut self.l as *mut u8) as *mut u16,
@@ -464,7 +434,7 @@ impl CPU {
             Register::SP => &mut self.sp,
             Register::D16 => &mut self.pc,
             _ => {
-                panic!("Invalid call to vAddr");
+                panic!("Invalid call to vaddr");
             }
         }
     }

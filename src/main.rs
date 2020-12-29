@@ -1,3 +1,4 @@
+#![feature(in_band_lifetimes)]
 #![no_std]
 #![no_main]
 

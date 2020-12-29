@@ -1,11 +1,13 @@
 use crate::cpu::inner::*;
 use crate::cpu::inner::Flag::*;
 use crate::cpu::inner::Register::*;
+use core::marker::PhantomData;
 
 /// Usable instructions for us to execute on based on an opcode `from_memory`. Do not derive
 /// any meaning from the order of the instructions, there is no method to the madness here.
 /// This will probably change as I get into timings.
 pub enum Instruction<T, D: Dst<T>, S: Src<T>> {
+    PHANTOM(PhantomData<(D, S)>),
     /// No operation
     NOP,
     /// ADDs either the value of an 8-bit register to A, our 8-bit accumulator,
@@ -110,8 +112,11 @@ pub enum Instruction<T, D: Dst<T>, S: Src<T>> {
     CB_INSTRUCTION,
 }
 
-impl<T, X: Dst<T>, Y: Src<T>> Instruction<T, X, Y> {
-    pub fn from_memory(prefixed: bool, byte: u8) -> Self {
+impl<T, D: Dst<T>, S: Src<T>> Instruction<T, D, S> {
+    pub fn from_memory(
+        prefixed: bool,
+        byte: u8,
+    ) -> Self {
         // The GBC's instruction set is about 50/50
         // prefixed vs non, so order shouldn't matter
         if !prefixed {
