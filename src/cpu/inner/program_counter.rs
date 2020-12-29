@@ -26,15 +26,3 @@ impl Countd for ProgramCounter {
         (high << 8) | low
     }
 }
-
-impl Dst<u8> for ProgramCounter {
-    unsafe fn write(&self, cpu: &mut CPU, val: u8) {
-        cpu.write_mem(*self, val);
-    }
-}
-
-impl Src<u8> for ProgramCounter {
-    unsafe fn read(&self, cpu: &mut CPU) -> u8 {
-        cpu.read_mem(*self)
-    }
-}

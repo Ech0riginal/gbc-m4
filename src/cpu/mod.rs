@@ -189,16 +189,19 @@ impl CPU {
                 let av: u8 = A.read(self);
                 let (nv, did_overflow) = av.overflowing_add(v);
 
-                self.flag.zero(nv == 0);
-                self.flag.subtract(false);
-                self.flag.carry(did_overflow);
-                self.flag.half_carry((v & 0xF) + (nv & 0xF) > 0xF);
-
                 A.write(self, nv);
+
+                self.set_flags(
+                    self.a == 0,
+                    false,
+                    did_overflow,
+                    (v & 0xF) + (nv & 0xF) > 0xF,
+                );
+
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::ADC(reg) => {
-                let v = reg.read(self);
+                let v = reg.read(self) as u16;
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
 
                 A.write(self, self.a + v + c);
@@ -216,10 +219,10 @@ impl CPU {
                 let r  = self.a.wrapping_sub(v);
                 let c = (self.a ^ v ^ r) as u16;
 
-                self.a = r;
+                A.write(self, r);
 
                 self.set_flags(
-                    self.a == 0,
+                    r == 0,
                     true,
                     (c & 0x0010) != 0,
                     (c & 0x0010) != 0,
@@ -229,40 +232,40 @@ impl CPU {
             Instruction::SBC(reg) => {
                 let v = reg.read(self);
                 let c = if (self.flag >> 4) & 0x01 == 1 { 1 } else { 0 };
+                let r = self.a.wrapping_sub(v).wrapping_sub(c);
 
-                self.a = self.a.wrapping_sub(v).wrapping_sub(c);
+                A.write(self, r);
 
                 self.set_flags(
-                    self.a == 0,
+                    r == 0,
                     true,
-                    self.a < 0,
-                    ((self.a & 0x0F) - (v & 0x0F) - c) < 0,
+                    r < 0,
+                    ((r & 0x0F) - (v & 0x0F) - c) < 0,
                 );
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::AND(reg) => {
-                self.a = self.a & reg.read(self);
+                A.write(self, self.a & reg.read(self));
                 self.set_flags(self.a == 0, false, true, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::OR(reg) => {
-                self.a = self.a | reg.read(self);
+                A.write(self.a | reg.read(self));
                 self.set_flags(self.a == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::XOR(reg) => {
-                self.a = self.a ^ reg.read(self);
+                A.write(self.a ^ reg.read(self));
                 self.set_flags(self.a == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             }
             Instruction::CP(reg) => {
-                let a = A.read(self);
                 let v = reg.read(self);
                 self.set_flags(
-                    a == v,
+                    self.a == v,
                     true,
-                    (a.wrapping_sub(v) & 0xf) > (a & 0xf),
-                    a < v
+                    (self.a.wrapping_sub(v) & 0xf) > (a & 0xf),
+                    self.a < v
                 );
             }
             Instruction::BIT(bit, reg) => {
@@ -271,23 +274,15 @@ impl CPU {
                 self.flag.subtract(false);
                 self.flag.half_carry(true);
             }
-            Instruction::RES(bit, reg) => {
-                if reg.is_virtual() {
-                    let r = self.addr(&reg) as *mut u16;
-                    *r = *r & !(0x01 << bit);
-                } else {
-                    let r = self.addr(&reg);
-                    *r = *r & !(0x01 << bit);
-                }
+            Instruction::RES(bit, mut reg) => {
+                let v = reg.read(self);
+                let r = v & !(0x01 << bit);
+                reg.write(self, r);
             }
-            Instruction::SET(bit, reg) => {
-                if reg.is_virtual() {
-                    let r = self.addr(&reg);
-                    *r = *r | !(0x01 << bit);
-                } else {
-                    let r = self.addr(&reg) as *mut u16;
-                    *r = *r | !(0x01 << bit);
-                }
+            Instruction::SET(bit, mut reg) => {
+                let v = reg.read(self);
+                let r = v | (0x01 << bit);
+                reg.write(self, r);
             }
 
             Instruction::JP(_flag, _reg) => { unimplemented!() }
@@ -318,30 +313,20 @@ impl CPU {
                 reg.write(self, r);
             }
             Instruction::SRA(mut reg) => {
-                let v = reg.read(self) >> 1;
-                reg.write(self, v);
+                let v = reg.read(self);
+                reg.write(self, v >> 1);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SLA(reg) => {
-                if reg.is_virtual() {
-                    *(self.vaddr(&reg)) <<= 1;
-                } else {
-                    *self.addr(&reg) <<= 1
-                }
+            Instruction::SLA(mut reg) => {
+                let v = reg.read(self);
+                reg.write(self, v << 1);
                 let _ = self.pc.wrapping_add(1);
             }
-            Instruction::SWAP(reg) => {
-                let v = if reg.is_virtual() {
-                    let r = self.addr(&reg) as *mut u16;
-                    *r = ((*r & 0x00FF) << 8) | ((*r & 0xFF00) >> 8);
-                    *r
-                } else {
-                    let r = self.addr(&reg);
-                    *r = ((*r & 0x0F) << 4) | ((*r & 0xF0) >> 4);
-                    *r as u16
-                };
-
-                self.set_flags(v == 0, false, false, false);
+            Instruction::SWAP(mut reg) => {
+                let v = reg.read(self);
+                let r = (v << 4) | (v >> 4);
+                reg.write(self, r);
+                self.set_flags(r == 0, false, false, false);
                 let _ = self.pc.wrapping_add(1);
             },
             Instruction::CALL(_, _) => { unimplemented!() }
@@ -369,6 +354,7 @@ impl CPU {
             Instruction::EI => { unimplemented!() }
             Instruction::DI => { unimplemented!() }
             Instruction::CB_INSTRUCTION => { unimplemented!() }
+            Instruction::PHANTOM(_) => {}
         }
     }
 
