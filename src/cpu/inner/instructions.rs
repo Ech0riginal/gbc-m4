@@ -1,44 +1,50 @@
-use super::*;
+use crate::cpu::*;
 
+#[inline]
 pub(crate) unsafe fn halt(cpu: &mut CPU) -> Timing {
     cpu.halted = true;
     Timing::Default
 }
 
-pub(crate) unsafe fn call<S: Src<u16>>(cpu: &mut CPU, flag: Flag, src: S) -> Timing {
-    let new_pc = src.read(cpu);
+#[inline]
+pub(crate) unsafe fn call(cpu: &mut CPU, flag: Flag) -> Timing {
+    let new_pc = D16.read(cpu);
     if flag.status(cpu) {
-        let ret = cpu.reg.pc;
-        cpu.push_u16(ret);
-        cpu.flag.pc(new_pc);
+        let ret = cpu.pc;
+        push_u16(cpu, ret);
+        cpu.pc = new_pc;
         Timing::Flag
     } else {
         Timing::Default
     }
 }
 
+#[inline]
 pub(crate) unsafe fn ret(cpu: &mut CPU, flag: Flag) -> Timing {
     if flag.status(cpu) {
-        let new_pc = cpu.pop_u16();
-        cpu.flag.pc(new_pc);
+        let new_pc = pop_u16(cpu);
+        cpu.pc = new_pc;
         Timing::Flag
     } else {
         Timing::Default
     }
 }
 
+#[inline]
 pub(crate) unsafe fn reti(cpu: &mut CPU) -> Timing {
     cpu.ei();
     cpu.ret(Flag::NF)
 }
 
+#[inline]
 pub(crate) unsafe fn rst(cpu: &mut CPU, p: u8) -> Timing {
-    let pc = cpu.reg.pc;
-    cpu.push_u16(pc);
-    cpu.flag.pc(p as u16);
+    let pc = cpu.pc;
+    push_u16(cpu, pc);
+    cpu.pc = p as u16;
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn ld<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
     let value = src.read(cpu);
 
@@ -46,18 +52,21 @@ pub(crate) unsafe fn ld<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S) 
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn ldi<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S, inc: Reg16) -> Timing {
     let t = cpu.ld(dst, src);
     cpu.inc_16(inc);
     t
 }
 
+#[inline]
 pub(crate) unsafe fn ldd<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S, dec: Reg16) -> Timing {
     let t = cpu.ld(dst, src);
     cpu.dec_16(dec);
     t
 }
 
+#[inline]
 pub(crate) unsafe fn jp<S: Src<u16>>(cpu: &mut CPU, flag: Flag, src: S) -> Timing {
     let new_pc = src.read(cpu);
     if flag.status(cpu) {
@@ -68,6 +77,7 @@ pub(crate) unsafe fn jp<S: Src<u16>>(cpu: &mut CPU, flag: Flag, src: S) -> Timin
     }
 }
 
+#[inline]
 pub(crate) unsafe fn jr<S: Src<u8>>(cpu: &mut CPU, flag: Flag, src: S) -> Timing {
     let offset = (src.read(cpu) as i8) as i16;
     if flag.status(cpu) {
@@ -80,6 +90,7 @@ pub(crate) unsafe fn jr<S: Src<u8>>(cpu: &mut CPU, flag: Flag, src: S) -> Timing
     }
 }
 
+#[inline]
 pub(crate) unsafe fn and<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     let a = src.read(cpu);
     let r = a & cpu.reg.a;
@@ -88,6 +99,7 @@ pub(crate) unsafe fn and<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn sbc<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
     let a = dst.read(cpu) as i16;
     let b = src.read(cpu) as i16;
@@ -101,6 +113,7 @@ pub(crate) unsafe fn sbc<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CPU,
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn adc<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
     let a = dst.read(cpu) as u16;
     let b = src.read(cpu) as u16;
@@ -111,12 +124,14 @@ pub(crate) unsafe fn adc<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CPU,
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn add_sp(cpu: &mut CPU) -> Timing {
     let new_sp = cpu.offset_sp();
     cpu.flag.sp(new_sp);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn ld_hl_sp(cpu: &mut CPU) -> Timing {
     let sp = cpu.offset_sp();
     cpu.flag.h((sp >> 8) as u8);
@@ -124,6 +139,7 @@ pub(crate) unsafe fn ld_hl_sp(cpu: &mut CPU) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn offset_sp(cpu: &mut CPU) -> u16 {
     let offset = (D8.read(cpu) as i8) as i32;
     let sp = (cpu.reg.sp as i16) as i32;
@@ -135,6 +151,7 @@ pub(crate) unsafe fn offset_sp(cpu: &mut CPU) -> u16 {
     r as u16
 }
 
+#[inline]
 pub(crate) unsafe fn add_8<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
     let a = dst.read(cpu) as u16;
     let b = src.read(cpu) as u16;
@@ -145,6 +162,7 @@ pub(crate) unsafe fn add_8<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CP
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn add_16<D: Dst<u16> + Src<u16> + Copy, S: Src<u16>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
     let a = dst.read(cpu) as u32;
     let b = src.read(cpu) as u32;
@@ -156,6 +174,7 @@ pub(crate) unsafe fn add_16<D: Dst<u16> + Src<u16> + Copy, S: Src<u16>>(cpu: &mu
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn sub_8<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
     let a = dst.read(cpu) as u16;
     let b = src.read(cpu) as u16;
@@ -166,30 +185,35 @@ pub(crate) unsafe fn sub_8<D: Dst<u8> + Src<u8> + Copy, S: Src<u8>>(cpu: &mut CP
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn rrca(cpu: &mut CPU) -> Timing {
     cpu.rrc(Reg8::A);
     cpu.flag.zero(false);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn rla(cpu: &mut CPU) -> Timing {
     cpu.rl(Reg8::A);
     cpu.flag.zero(false);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn rra(cpu: &mut CPU) -> Timing {
     cpu.rr(Reg8::A);
     cpu.flag.zero(false);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn rlca(cpu: &mut CPU) -> Timing {
     cpu.rlc(Reg8::A);
     cpu.flag.zero(false);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn rlc<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a.rotate_left(1);
@@ -200,6 +224,7 @@ pub(crate) unsafe fn rlc<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.reg.carry = (a & 0x80) != 0
 }
 
+#[inline]
 pub(crate) unsafe fn rl<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a << 1;
@@ -211,6 +236,7 @@ pub(crate) unsafe fn rl<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.reg.carry = (a & 0x80) != 0
 }
 
+#[inline]
 pub(crate) unsafe fn rr<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a >> 1;
@@ -219,6 +245,7 @@ pub(crate) unsafe fn rr<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.set_flags(r == 0, false, false, (a & 0x01) != 0);
 }
 
+#[inline]
 pub(crate) unsafe fn rrc<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a.rotate_right(1);
@@ -229,6 +256,7 @@ pub(crate) unsafe fn rrc<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.reg.carry = (a & 0x01) != 0
 }
 
+#[inline]
 pub(crate) unsafe fn sla<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a << 1;
@@ -239,6 +267,7 @@ pub(crate) unsafe fn sla<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.reg.carry = (a & 0x80) != 0
 }
 
+#[inline]
 pub(crate) unsafe fn sra<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a >> 1;
@@ -250,6 +279,7 @@ pub(crate) unsafe fn sra<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.reg.carry = (a & 0x01) != 0
 }
 
+#[inline]
 pub(crate) unsafe fn daa(cpu: &mut CPU) -> Timing {
     let mut a = cpu.reg.a as u16;
     let n = cpu.reg.subtract;
@@ -278,6 +308,7 @@ pub(crate) unsafe fn daa(cpu: &mut CPU) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn scf(cpu: &mut CPU) -> Timing {
     cpu.flag.subtract(false);
     cpu.flag.half_carry(false);
@@ -285,6 +316,7 @@ pub(crate) unsafe fn scf(cpu: &mut CPU) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn ccf(cpu: &mut CPU) -> Timing {
     cpu.flag.subtract(false);
     cpu.flag.half_carry(false);
@@ -292,6 +324,7 @@ pub(crate) unsafe fn ccf(cpu: &mut CPU) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn bit<S: Src<u8>>(cpu: &mut CPU, bit: u8, src: S) {
     let a = src.read(cpu) >> bit;
     cpu.flag.zero((a & 0x01) == 0);
@@ -299,6 +332,7 @@ pub(crate) unsafe fn bit<S: Src<u8>>(cpu: &mut CPU, bit: u8, src: S) {
     cpu.flag.half_carry(true);
 }
 
+#[inline]
 pub(crate) unsafe fn srl<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = a >> 1;
@@ -306,18 +340,21 @@ pub(crate) unsafe fn srl<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     cpu.set_flags(r == 0, false, false, (a & 0x01) != 0);
 }
 
+#[inline]
 pub(crate) unsafe fn res<L: Src<u8> + Dst<u8> + Copy>(cpu: &mut CPU, bit: u8, loc: L) {
     let a = loc.read(cpu);
     let r = a & !(0x01 << bit);
     loc.write(cpu, r)
 }
 
+#[inline]
 pub(crate) unsafe fn set<L: Src<u8> + Dst<u8> + Copy>(cpu: &mut CPU, bit: u8, loc: L) {
     let a = loc.read(cpu);
     let r = a | (0x01 << bit);
     loc.write(cpu, r)
 }
 
+#[inline]
 pub(crate) unsafe fn swap_8<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) {
     let a = loc.read(cpu);
     let r = (a << 4) | (a >> 4);
@@ -328,6 +365,7 @@ pub(crate) unsafe fn swap_8<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) 
     cpu.reg.carry = false
 }
 
+#[inline]
 pub(crate) unsafe fn xor<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     let a = src.read(cpu);
     let r = cpu.reg.a ^ a;
@@ -336,6 +374,7 @@ pub(crate) unsafe fn xor<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn or<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     let a = src.read(cpu);
     let r = cpu.reg.a | a;
@@ -344,6 +383,7 @@ pub(crate) unsafe fn or<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn cpl(cpu: &mut CPU) -> Timing {
     let a = cpu.reg.a;
     cpu.flag.a(!a);
@@ -352,6 +392,7 @@ pub(crate) unsafe fn cpl(cpu: &mut CPU) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn cp<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     let a = cpu.reg.a;
     let value = src.read(cpu);
@@ -362,6 +403,7 @@ pub(crate) unsafe fn cp<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn inc_8<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) -> Timing {
     let value = loc.read(cpu);
     let result = value.wrapping_add(1);
@@ -372,6 +414,7 @@ pub(crate) unsafe fn inc_8<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) -
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn inc_16<L: Dst<u16> + Src<u16> + Copy>(cpu: &mut CPU, loc: L) -> Timing {
     // No condition bits are affected for 16 bit inc
     let value = loc.read(cpu);
@@ -379,6 +422,7 @@ pub(crate) unsafe fn inc_16<L: Dst<u16> + Src<u16> + Copy>(cpu: &mut CPU, loc: L
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn dec_8<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) -> Timing {
     let value = loc.read(cpu);
     let result = value.wrapping_sub(1);
@@ -389,6 +433,7 @@ pub(crate) unsafe fn dec_8<L: Dst<u8> + Src<u8> + Copy>(cpu: &mut CPU, loc: L) -
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn dec_16<L: Dst<u16> + Src<u16> + Copy>(cpu: &mut CPU, loc: L) -> Timing {
     // No condition bits are affected for 16 bit dec
     let value = loc.read(cpu);
@@ -396,28 +441,33 @@ pub(crate) unsafe fn dec_16<L: Dst<u16> + Src<u16> + Copy>(cpu: &mut CPU, loc: L
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn push<S: Src<u16>>(cpu: &mut CPU, src: S) -> Timing {
     let value = src.read(cpu);
     cpu.push_u16(value);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn pop<D: Dst<u16>>(cpu: &mut CPU, dst: D) -> Timing {
     let value = cpu.pop_u16();
     dst.write(cpu, value);
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn di(cpu: &mut CPU) -> Timing {
     cpu.ime = false;
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn ei(cpu: &mut CPU) -> Timing {
     cpu.ime = true;
     Timing::Default
 }
 
+#[inline]
 pub(crate) unsafe fn fetch_u8(cpu: &mut CPU) -> u8 {
     let pc = cpu.reg.pc;
     let value = cpu.interconnect.read(pc);
@@ -425,36 +475,42 @@ pub(crate) unsafe fn fetch_u8(cpu: &mut CPU) -> u8 {
     value
 }
 
+#[inline]
 pub(crate) unsafe fn fetch_u16(cpu: &mut CPU) -> u16 {
     let low = cpu.pc.d8() as u16;
     let high = cpu.pc.d8() as u16;
     (high << 8) | low
 }
 
+#[inline]
 pub(crate) unsafe fn push_u8(cpu: &mut CPU, value: u8) {
     let sp = cpu.reg.sp.wrapping_sub(1);
     cpu.interconnect.write(sp, value);
     cpu.reg.sp = sp
 }
 
+#[inline]
 pub(crate) unsafe fn push_u16(cpu: &mut CPU, value: u16) {
     cpu.push_u8((value >> 8) as u8);
     cpu.push_u8(value as u8);
 }
 
+#[inline]
 pub(crate) unsafe fn pop_u8(cpu: &mut CPU) -> u8 {
-    let sp = cpu.reg.sp;
-    let value = cpu.interconnect.read(sp);
+    let sp = cpu.sp;
+    let value = cpu.read(sp);
     cpu.flag.sp(sp.wrapping_add(1));
     value
 }
 
+#[inline]
 pub(crate) unsafe fn pop_u16(cpu: &mut CPU) -> u16 {
-    let low = cpu.pop_u8() as u16;
-    let high = cpu.pop_u8() as u16;
+    let low = cpu.pc.d8() as u16;
+    let high = cpu.pc.d8() as u16;
     (high << 8) | low
 }
 
+#[inline]
 pub(crate) unsafe fn stop() -> Timing {
     // http://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
     //
