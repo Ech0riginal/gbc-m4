@@ -151,6 +151,30 @@ impl Dst<u8> for ZMem<Register> {
 }
 
 
+impl Src<u16> for Register {
+    unsafe fn read(&self, cpu: &mut CPU) -> u16 {
+        match self {
+            Register::D16 => cpu.pc.d16(),
+            _ => *(cpu.vaddr(self))
+        }
+    }
+}
+
+impl Dst<u16> for Register {
+    unsafe fn write(&self, cpu: &mut CPU, val: u16) { *(cpu.vaddr(self)) = val; }
+}
+
+impl Dst<u16> for Mem<Register> {
+    unsafe fn write(&self, cpu: &mut CPU, val: u16) {
+        let Mem(reg) = self;
+        let addr = *(cpu.vaddr(reg));
+        let l = val as u8;
+        let h = (val >> 8) as u8;
+        cpu.write_mem(addr, l);
+        cpu.write_mem(addr + 1, h);
+
+    }
+}
 
 impl Register {
     pub fn is_virtual(&self) -> bool {
