@@ -1,3 +1,5 @@
+use crate::cpu::CPU;
+
 pub type FlagRegister = u8;
 
 pub trait Flagd {
@@ -45,24 +47,25 @@ impl Flagd for FlagRegister {
 pub enum Flag {
     /// NOP, but for Flags
     NF,
-    /// When we need to store a value at a memory location specified by a 16-bit register
-    STR,
-    /// When we need to grab the value specified by a 16-bit register into the 8-bit accumulator
-    GRB,
     /// Zero flag
     Z,
     /// Not-zero flag
     NZ,
-    /// Subtract flag
-    S,
     /// Carry flag
     CY,
     /// Not-carry flag
     NC,
-    /// Half-carry flag
-    HCY,
-    /// Tells the cpu that the registers given contain the value and the address to store to RAM
-    RAM,
-    /// Tells the cpu that the registers given contain the value and the address to store to VRAM
-    VRAM,
+}
+
+impl Flag {
+    pub fn status(&self, cpu: &CPU) -> bool {
+        match self {
+            Self::NF => true,
+            Self::Z => cpu.flag >> 7 == 1,
+            Self::NZ => cpu.flag >> 7 == 0,
+            Self::CY => cpu.flag >> 5 == 1,
+            Self::NC => cpu.flag >> 5 == 0,
+            _ => panic!("Bad status call: {:016b}: {:016b}", cpu.pc, cpu.sp)
+        }
+    }
 }

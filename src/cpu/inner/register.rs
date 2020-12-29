@@ -1,12 +1,16 @@
 use super::super::CPU;
 use crate::cpu::inner::Countd;
 
-pub(crate) trait Src<T> {
+pub trait Src<T> {
     unsafe fn read(&self, cpu: &mut CPU) -> T;
 }
 
-pub(crate) trait Dst<T> {
+pub trait Dst<T> {
     unsafe fn write(&self, cpu: &mut CPU, val: T);
+}
+
+pub trait Registerd {
+    fn is_virtual(&self) -> bool;
 }
 
 /// Wraps a Register so we can recognize it as containing a vram address instead of a value
@@ -55,8 +59,8 @@ pub(crate) enum Register {
 
 // TODO DOC ALL of this
 
-impl Register {
-    pub fn is_virtual(&self) -> bool {
+impl Registerd for Register {
+    fn is_virtual(&self) -> bool {
         match self {
             Self::AF | Self::BC | Self::DE => true,
             Self::HL | Self::HLi | Self::HLd => true,
@@ -140,6 +144,5 @@ impl Dst<u16> for Mem<Register> {
         let h = (val >> 8) as u8;
         cpu.write_mem(addr, l);
         cpu.write_mem(addr + 1, h);
-
     }
 }
