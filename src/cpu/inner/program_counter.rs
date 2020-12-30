@@ -1,6 +1,3 @@
-use super::{Src, Dst};
-use crate::cpu::CPU;
-
 pub type ProgramCounter = u16;
 
 pub trait Countd {

@@ -20,7 +20,7 @@ pub trait Registerd8 {
 
 pub trait Registerd16 {
     /// A function that returns a pointer to a 16-bit virtual register
-    unsafe fn vaddr(&mut self, r: &Register) -> *mut u8;
+    unsafe fn vaddr(&mut self, r: &Register) -> *mut u16;
 }
 
 
@@ -31,7 +31,7 @@ pub(crate) struct Mem<T: Src<u16>>(pub T);
 
 /// Lets us construct concise `Instruction`s for our `CPU` to operate on. As you can imagine, they're
 /// tightly coupled and will most likely remain that way.
-pub(crate) enum Register {
+pub enum Register {
     /// Pseudo-register we use to tell the cpu to consume the first byte of the Program Counter.
     D8,
     /// The accumulator register, A.

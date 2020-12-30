@@ -42,7 +42,7 @@ fn main() -> ! {
 fn event_loop(mut pins: itsybitsy_m4::Pins, mut wdt: Watchdog, _delay: Delay) -> ! {
     wdt.start(WatchdogTimeout::Cycles256 as u8);
 
-    let cpu = cpu::CPU::new();
+    let cpu = unsafe { cpu::CPU::new() };
     // Turns off the indicator until we need it
     let mut _indicator = pins.d13.into_open_drain_output(&mut pins.port);
 

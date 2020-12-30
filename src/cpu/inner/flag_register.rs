@@ -1,5 +1,3 @@
-use crate::cpu::CPU;
-
 /// The GBC's opcodes often imply behavior we define herein, pulled from @meganesu's work.
 pub enum Flag {
     /// NOP, but for Flags
@@ -12,6 +10,10 @@ pub enum Flag {
     CY,
     /// Not-carry flag
     NC,
+    /// Half-carry flag
+    HC,
+    /// Subtract flag
+    S
 }
 
 pub trait Flagd {
