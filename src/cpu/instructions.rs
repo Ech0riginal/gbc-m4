@@ -1,5 +1,5 @@
-use crate::cpu::CPU;
 use super::*;
+use crate::cpu::CPU;
 
 /// After a HALT instruction is executed, the system clock is stopped and HALT mode is entered.
 /// Although the system clock is stopped in this status, the oscillator circuit and LCD controller continue to operate.
@@ -23,7 +23,6 @@ pub(crate) unsafe fn halt(cpu: &mut CPU) -> Timing {
     cpu.halted = true;
     Timing::Default
 }
-
 
 /// In memory, push the program counter PC value corresponding to the address following the CALL
 /// instruction to the 2 bytes following the byte specified by the current stack pointer SP. Then
@@ -85,9 +84,8 @@ pub(crate) unsafe fn ret(cpu: &mut CPU, f: Flag) -> Timing {
 #[inline]
 pub(crate) unsafe fn reti(cpu: &mut CPU) -> Timing {
     ei(cpu);
-    ret(cpu,Flag::NF)
+    ret(cpu, Flag::NF)
 }
-
 
 /// Push the current value of the program counter PC onto the memory stack, and load into PC the
 /// Nth byte of page 0 memory addresses, 0xN0. The next instruction is fetched from the address
@@ -127,7 +125,12 @@ pub(crate) unsafe fn ld<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S) 
 ///
 /// Same behavior as LD, but will increment a 16-bit register
 #[inline]
-pub(crate) unsafe fn ldi<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S, inc: Register) -> Timing {
+pub(crate) unsafe fn ldi<T, D: Dst<T>, S: Src<T>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+    inc: Register,
+) -> Timing {
     let t = ld(cpu, dst, src);
     inc_16(cpu, inc);
     t
@@ -137,7 +140,12 @@ pub(crate) unsafe fn ldi<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S,
 ///
 /// Same behavior as LD, but will decrement a 16-bit register
 #[inline]
-pub(crate) unsafe fn ldd<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S, dec: Register) -> Timing {
+pub(crate) unsafe fn ldd<T, D: Dst<T>, S: Src<T>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+    dec: Register,
+) -> Timing {
     let t = ld(cpu, dst, src);
     dec_16(cpu, dec);
     t
@@ -151,7 +159,7 @@ pub(crate) unsafe fn ldd<T, D: Dst<T>, S: Src<T>>(cpu: &mut CPU, dst: D, src: S,
 pub(crate) unsafe fn jp<S: Src<u16>>(cpu: &mut CPU, f: Flag, src: S) -> Timing {
     let new_pc = src.read(cpu);
     if cpu.status(f) {
-        cpu.pc  = new_pc;
+        cpu.pc = new_pc;
         Timing::Flag
     } else {
         Timing::Default
@@ -187,7 +195,11 @@ pub(crate) unsafe fn and<S: Src<u8>>(cpu: &mut CPU, src: S) -> Timing {
 /// Subtract the contents of the source register and the CY flag from the contents of register A,
 /// and store the results in register A.
 #[inline]
-pub(crate) unsafe fn sbc<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
+pub(crate) unsafe fn sbc<D: Dst<u8> + Src<u8>, S: Src<u8>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+) -> Timing {
     let a = dst.read(cpu) as i16;
     let b = src.read(cpu) as i16;
     let c = if cpu.status(Flag::CY) { 1 } else { 0 };
@@ -195,7 +207,12 @@ pub(crate) unsafe fn sbc<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst: D
 
     dst.write(cpu, r as u8);
 
-    cpu.set_flags((r as u8) == 0, true, ((a & 0x0f) - (b & 0x0f) - c) < 0, r < 0);
+    cpu.set_flags(
+        (r as u8) == 0,
+        true,
+        ((a & 0x0f) - (b & 0x0f) - c) < 0,
+        r < 0,
+    );
 
     Timing::Default
 }
@@ -204,13 +221,22 @@ pub(crate) unsafe fn sbc<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst: D
 /// store the results in the 8-bit accumulator. If the source is a virtual register, it will use
 /// the value at the address given by that register.
 #[inline]
-pub(crate) unsafe fn adc<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
+pub(crate) unsafe fn adc<D: Dst<u8> + Src<u8>, S: Src<u8>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+) -> Timing {
     let a = dst.read(cpu) as u16;
     let b = src.read(cpu) as u16;
     let c = if cpu.status(Flag::CY) { 1 } else { 0 };
     let r = a + b + c;
     dst.write(cpu, r as u8);
-    cpu.set_flags((r as u8) == 0, false, ((a & 0x0f) + (b & 0x0f) + c) > 0x0f, r > 0x00ff);
+    cpu.set_flags(
+        (r as u8) == 0,
+        false,
+        ((a & 0x0f) + (b & 0x0f) + c) > 0x0f,
+        r > 0x00ff,
+    );
     Timing::Default
 }
 
@@ -240,13 +266,17 @@ pub(crate) unsafe fn offset_sp(cpu: &mut CPU) -> u16 {
         false,
         false,
         ((sp ^ offset ^ (r & 0xffff)) & 0x10) == 0x10,
-        ((sp ^ offset ^ (r & 0xffff)) & 0x100) == 0x100
+        ((sp ^ offset ^ (r & 0xffff)) & 0x100) == 0x100,
     );
     r as u16
 }
 
 #[inline]
-pub(crate) unsafe fn add_8<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
+pub(crate) unsafe fn add_8<D: Dst<u8> + Src<u8>, S: Src<u8>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+) -> Timing {
     let a = dst.read(cpu) as u16;
     let b = src.read(cpu) as u16;
     let r = a + b;
@@ -257,7 +287,11 @@ pub(crate) unsafe fn add_8<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst:
 }
 
 #[inline]
-pub(crate) unsafe fn add_16<D: Dst<u16> + Src<u16>, S: Src<u16>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
+pub(crate) unsafe fn add_16<D: Dst<u16> + Src<u16>, S: Src<u16>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+) -> Timing {
     let a = dst.read(cpu) as u32;
     let b = src.read(cpu) as u32;
     let r = a + b;
@@ -269,7 +303,11 @@ pub(crate) unsafe fn add_16<D: Dst<u16> + Src<u16>, S: Src<u16>>(cpu: &mut CPU, 
 }
 
 #[inline]
-pub(crate) unsafe fn sub_8<D: Dst<u8> + Src<u8>, S: Src<u8>>(cpu: &mut CPU, dst: D, src: S) -> Timing {
+pub(crate) unsafe fn sub_8<D: Dst<u8> + Src<u8>, S: Src<u8>>(
+    cpu: &mut CPU,
+    dst: D,
+    src: S,
+) -> Timing {
     let a = dst.read(cpu) as u16;
     let b = src.read(cpu) as u16;
     let r = a.wrapping_sub(b);

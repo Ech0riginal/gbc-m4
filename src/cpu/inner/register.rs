@@ -23,7 +23,6 @@ pub trait Registerd16 {
     unsafe fn vaddr(&mut self, r: &Register) -> *mut u16;
 }
 
-
 /// Wraps a Register so we can recognize it as containing a vram address instead of a value
 pub(crate) struct ZMem<T: Src<u8>>(pub T);
 /// Wraps a Register so we can recognize it as containing a ram  address instead of a value
@@ -75,7 +74,7 @@ impl Registerd for Register {
         match self {
             Self::AF | Self::BC | Self::DE => true,
             Self::HL | Self::HLi | Self::HLd => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -84,7 +83,7 @@ impl Src<u8> for Register {
     unsafe fn read(&self, cpu: &mut CPU) -> u8 {
         match self {
             Register::D8 => cpu.pc.d8(),
-            _ => *(cpu.addr(self))
+            _ => *(cpu.addr(self)),
         }
     }
 }
@@ -100,16 +99,19 @@ impl Src<u8> for Mem<Register> {
 impl Src<u8> for ZMem<Register> {
     unsafe fn read(&self, cpu: &mut CPU) -> u8 {
         let ZMem(reg) = self;
-        let addr = 0xff00 + match reg {
-            Register::D8 => cpu.pc.d8(),
-            _ => *(cpu.addr(reg)),
-        } as u16;
+        let addr = 0xff00
+            + match reg {
+                Register::D8 => cpu.pc.d8(),
+                _ => *(cpu.addr(reg)),
+            } as u16;
         cpu.read_mem(addr)
     }
 }
 
 impl Dst<u8> for Register {
-    unsafe fn write(&self, cpu: &mut CPU, val: u8) { *(cpu.addr(self)) = val; }
+    unsafe fn write(&self, cpu: &mut CPU, val: u8) {
+        *(cpu.addr(self)) = val;
+    }
 }
 
 impl Dst<u8> for Mem<Register> {
@@ -117,7 +119,7 @@ impl Dst<u8> for Mem<Register> {
         let Mem(reg) = self;
         let addr = match reg {
             Register::D16 => cpu.pc.d16(),
-            _ => *(cpu.vaddr(reg))
+            _ => *(cpu.vaddr(reg)),
         };
         cpu.write_mem(addr, val);
     }
@@ -126,10 +128,11 @@ impl Dst<u8> for Mem<Register> {
 impl Dst<u8> for ZMem<Register> {
     unsafe fn write(&self, cpu: &mut CPU, val: u8) {
         let ZMem(reg) = self;
-        let addr = 0xff00 + match reg {
-            Register::D8 => cpu.pc.d8(),
-            _ => *(cpu.addr(reg))
-        } as u16;
+        let addr = 0xff00
+            + match reg {
+                Register::D8 => cpu.pc.d8(),
+                _ => *(cpu.addr(reg)),
+            } as u16;
         cpu.write_mem(addr, val);
     }
 }
@@ -138,13 +141,15 @@ impl Src<u16> for Register {
     unsafe fn read(&self, cpu: &mut CPU) -> u16 {
         match self {
             Register::D16 => cpu.pc.d16(),
-            _ => *(cpu.vaddr(self))
+            _ => *(cpu.vaddr(self)),
         }
     }
 }
 
 impl Dst<u16> for Register {
-    unsafe fn write(&self, cpu: &mut CPU, val: u16) { *(cpu.vaddr(self)) = val; }
+    unsafe fn write(&self, cpu: &mut CPU, val: u16) {
+        *(cpu.vaddr(self)) = val;
+    }
 }
 
 impl Dst<u16> for Mem<Register> {

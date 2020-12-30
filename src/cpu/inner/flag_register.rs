@@ -13,7 +13,7 @@ pub enum Flag {
     /// Half-carry flag
     HC,
     /// Subtract flag
-    S
+    S,
 }
 
 pub trait Flagd {

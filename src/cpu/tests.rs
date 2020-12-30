@@ -1,4 +1,4 @@
-use super::{CPU, Instruction, Register};
+use super::{Instruction, Register, CPU};
 
 /* well, if we could test that would be nice, TODO this later
 
@@ -38,10 +38,9 @@ fn cpu() -> CPU {
         l: 6,
         pc: 0,
         sp: 0,
-        bus: [0u8; 65535]
+        bus: [0u8; 65535],
     }
 }
-
 
 #[test]
 fn test_add_8() {
