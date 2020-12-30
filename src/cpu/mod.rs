@@ -494,6 +494,7 @@ impl CPU {
 
     #[inline]
     unsafe fn execute_cb(&mut self, opcode: u8) -> Timing {
+        use Flag::*;
         use Register::*;
 
         match opcode {
