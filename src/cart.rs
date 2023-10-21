@@ -1,165 +1,171 @@
-use std::fmt;
-use std::fmt::Debug;
-use std::string::String;
-use std::boxed::Box;
+pub const CART: &[u8] = include_bytes!("red.gb");
 
-use super::mbc::Mbc;
-use super::mbc::MbcType;
-use super::mbc::RamInfo;
-use super::mbc::MbcInfo;
-use super::GameboyType;
+pub fn entry<'c>() -> &'c [u8] { &CART[0x100..0x104] }
 
-pub struct Cart {
-    bytes: Box<[u8]>,
-    mbc: Box<Mbc>,
+
+pub fn logo<'c>() -> &'c [u8] { &CART[0x104..0x134] }
+
+
+pub fn title<'c>() -> &'c [u8] {
+    let arr: &[u8] = &CART[0x134..0x144];
+    let mut i = arr.len() - 1;
+    // 'trim' off zeros
+    while i > 0 {
+        if arr[i.clone()] != 0 { break; }
+        i -= 1;
+    }
+
+    &CART[0x134..0x135+i]
 }
 
-#[derive(Debug)]
-pub enum DestinationCode {
-    Japanese,
-    NonJapanese,
-}
 
-impl Cart {
-    pub fn new(bytes: Box<[u8]>, ram: Option<Box<[u8]>>) -> Cart {
-        let mbc_info = Cart::get_mbc_info(&bytes);
-        let mbc = super::mbc::new_mbc(mbc_info, ram);
-        Cart {
-            bytes: bytes,
-            mbc: mbc,
-        }
-    }
+pub fn manufacturer_code<'c>() -> &'c [u8] { &CART[0x13f..0x143] }
 
-    pub fn title(&self) -> String {
-        let mut title = Vec::new();
-        for i in 0x0134..0x0143 {
-            title.push(self.bytes[i]);
-        }
-        String::from_utf8(title).unwrap()
-    }
 
-    pub fn mbc_info(&self) -> MbcInfo {
-        Cart::get_mbc_info(&self.bytes)
-    }
+pub fn cgb_flag<'c>() -> &'c u8 { &CART[0x143] }
 
-    fn get_mbc_info(bytes: &Box<[u8]>) -> MbcInfo {
-        let ram_info = if Cart::get_ram_size(&bytes) != 0 {
-            Some(RamInfo::new(Cart::get_ram_size(&bytes), Cart::get_ram_bank_count(&bytes)))
-        } else {
-            None
-        };
-        match bytes[0x0147] {
-            0x00 => MbcInfo::new(MbcType::None, ram_info, false),
-            0x01 => MbcInfo::new(MbcType::Mbc1, ram_info, false),
-            0x02 => MbcInfo::new(MbcType::Mbc1, ram_info, false),
-            0x03 => MbcInfo::new(MbcType::Mbc1, ram_info, true),
-            0x13 => MbcInfo::new(MbcType::Mbc3, ram_info, true),
-            0x19 => MbcInfo::new(MbcType::Mbc5, ram_info, false),
-            0x1b => MbcInfo::new(MbcType::Mbc5, ram_info, true),
-            _ => panic!("Unsupported mbc_info: 0x{:x}", bytes[0x0147]),
-        }
-    }
 
-    pub fn rom_size(&self) -> u32 {
-        match self.bytes[0x0148] {
-            0 => 1024 * 32,
-            1 => 1024 * 64,
-            2 => 1024 * 128,
-            3 => 1024 * 256,
-            4 => 1024 * 512,
-            5 => 1024 * 1024,
-            6 => 1024 * 1024 * 2,
-            _ => panic!("Unsupported rom size: {:x}", self.bytes[0x0148]),
-        }
-    }
+pub fn new_licensee_code<'c>() -> &'c [u8] { &CART[0x144..0x146] }
 
-    pub fn rom_bank_count(&self) -> u32 {
-        self.rom_size() / (1024 * 16)
-    }
 
-    #[allow(dead_code)]
-    pub fn ram_size(&self) -> u32 {
-        Cart::get_ram_size(&self.bytes)
-    }
+pub fn sgb_flag<'c>() -> &'c u8 { &CART[0x146] }
 
-    fn get_ram_size(bytes: &Box<[u8]>) -> u32 {
-        match bytes[0x149] {
-            0 => 0,
-            1 => 1024 * 2,
-            2 => 1024 * 8,
-            3 => 1024 * 32,
-            4 => 1024 * 128,
-            _ => panic!("Unsupported ram size: {:x}", bytes[0x0149]),
-        }
-    }
+// AKA MBC-type
+pub fn cart_type<'c>() -> &'c u8 { &CART[0x147] }
 
-    #[allow(dead_code)]
-    pub fn ram_bank_count(&self) -> u32 {
-        Cart::get_ram_bank_count(&self.bytes)
-    }
 
-    fn get_ram_bank_count(bytes: &Box<[u8]>) -> u32 {
-        match bytes[0x0149] {
-            0 => 0,
-            1 | 2 => 1,
-            3 => 4,
-            4 => 16,
-            _ => panic!("Unsupported ram size"),
-        }
-    }
+pub fn rom_size<'c>() -> &'c u8 { &CART[0x148] }
 
-    pub fn destination_code(&self) -> DestinationCode {
-        match self.bytes[0x014a] {
-            0 => DestinationCode::Japanese,
-            1 => DestinationCode::NonJapanese,
-            _ => panic!("Unsupported destination code"),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn gameboy_type(&self) -> GameboyType {
-        match self.bytes[0x0143] {
-            // TODO: confirm that this is correct
-            0x80 | 0xc0 => GameboyType::Cgb,
-            _ => GameboyType::Dmg,
-        }
-    }
-
-    pub fn read(&self, addr: u16) -> u8 {
-        self.mbc.read(&self.bytes, addr)
-    }
-
-    pub fn write(&mut self, addr: u16, val: u8) {
-        self.mbc.write(addr, val)
-    }
-
-    pub fn read_ram(&self, addr: u16) -> u8 {
-        self.mbc.read_ram(addr)
-    }
-
-    pub fn write_ram(&mut self, addr: u16, val: u8) {
-        self.mbc.write_ram(addr, val)
-    }
-
-    pub fn copy_ram(&self) -> Option<Box<[u8]>> {
-        self.mbc.copy_ram()
+pub fn human_rom_size() -> u32 {
+    match rom_size() {
+        0 => 1024 * 32,
+        1 => 1024 * 64,
+        2 => 1024 * 128,
+        3 => 1024 * 256,
+        4 => 1024 * 512,
+        5 => 1024 * 1024,
+        6 => 1024 * 1024 * 2,
+        n => panic!("Unsupported rom size: {}", *n),
     }
 }
 
-impl Debug for Cart {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "Cart {{
-    title: {},
-    mbc_info: {:?},
-    size: {:?},
-    bank_count: {:?},
-    destination_code: {:?},
+pub fn ram_size<'c>() -> &'c u8 { &CART[0x149] }
+
+pub fn human_ram_size<'c>() -> u32 {
+    match ram_size() {
+        0 => 0,
+        1 => 1024 * 2,
+        2 => 1024 * 8,
+        3 => 1024 * 32,
+        4 => 1024 * 128,
+        n => panic!("Unsupported ram size: {}", *n),
+    }
+}
+
+pub fn real_ram_bank_count<'c>() -> u8 {
+    let rsize = ram_size();
+    match ram_size() {
+        0 => 0,
+        1 | 2 => 1,
+        3 => 4,
+        4 => 16,
+        n => panic!("Unsupported ram size: {}", *n),
+    }
+}
+
+
+pub fn dest_code<'c>() -> &'c u8 { &CART[0x14a] }
+
+
+pub fn old_licensee_code<'c>() -> &'c u8 { &CART[0x14b] }
+
+
+pub fn mask_rom_ver_number<'c>() -> &'c u8 { &CART[0x14c] }
+
+
+pub fn header_checksum<'c>() -> &'c u8 { &CART[0x14d] }
+
+
+pub fn global_checksum<'c>() -> &'c [u8] { &CART[0x14e..0x150] }
+
+
+pub fn game_data<'c>() -> &'c [u8] { &CART[0x150..0x3fff] }
+
+
+pub fn debug() {
+    println!(
+           "Cart {{
+    entry: {:?}
+    logo: {:?}
+    title: {}
+    manufacturer_code: {}
+    cgb_flag: {}
+    new_licensee_code: {}
+    sgb_flag: {}
+    cart_type: {}
+    rom_size (machine|human): {} - {}kb
+    ram_size (machine|human): {} - {}kb
+    dest_code: {}
+    old_licensee_code: {}
+    mask_rom_ver_number: {}
+    header_checksum: {}
+    global_checksum: {:?}
 }}",
-               self.title(),
-               self.mbc_info(),
-               self.rom_size(),
-               self.rom_bank_count(),
-               self.destination_code())
+            entry(),
+            logo(),
+            to_str(title()),
+            to_str(manufacturer_code()),
+            cgb_flag(),
+            to_str(new_licensee_code()),
+            sgb_flag(),
+            cart_type(),
+            rom_size(),
+            human_rom_size(),
+            ram_size(),
+            human_ram_size(),
+            dest_code(),
+            old_licensee_code(),
+            mask_rom_ver_number(),
+            header_checksum(),
+            global_checksum(),
+    );
+}
+
+#[inline]
+fn to_str(bytes: &[u8]) -> &str {
+    std::str::from_utf8(bytes).unwrap()
+}
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use crate::cart;
+
+    #[test]
+    fn does_load() {
+        cart::debug();
+    }
+
+
+    #[test]
+    fn logo() {
+        let expected = [
+            0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+            0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+            0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
+        ];
+        let actual = cart::logo();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn entry() {
+        let expected = cart::logo();
+        let actual = cart::entry();
+
+        assert_eq!(expected, actual);
     }
 }
