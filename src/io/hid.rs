@@ -1,5 +1,10 @@
-use atsamd_hal::gpio::*;
-use atsamd_hal::prelude::*;
+use itsybitsy_m4::hal::prelude::*;
+use itsybitsy_m4::hal::gpio::v2::*;
+
+use itsybitsy_m4;
+use itsybitsy_m4::Pins;
+use itsybitsy_m4::hal::pac::Peripherals;
+use itsybitsy_m4::pac::PORT;
 
 pub enum Pressed {
     Up,
@@ -13,13 +18,14 @@ pub enum Pressed {
 }
 
 pub struct Buttons {
-    pub(crate) a: Pa13<Input<PullUp>>,
-    pub(crate) b: Pa18<Input<PullUp>>,
-    pub(crate) up: Pa20<Input<PullUp>>,
-    pub(crate) down: Pa23<Input<PullUp>>,
-    pub(crate) left: Pa21<Input<PullUp>>,
-    pub(crate) right: Pa19<Input<PullUp>>,
-    pub(crate) menu: Pa12<Input<PullUp>>,
+    // pub(crate) a: Pin<PA22, atsamd_hal::gpio::v2::Input<atsamd_hal::gpio::v2::PullUp>>,
+    pub a: Pin<PA13, Input<PullUp>>,
+    pub b: Pin<PA18, Input<PullUp>>,
+    pub up: Pin<PA20, Input<PullUp>>,
+    pub down: Pin<PA23, Input<PullUp>>,
+    pub left: Pin<PA21, Input<PullUp>>,
+    pub right: Pin<PA19, Input<PullUp>>,
+    pub menu: Pin<PA12, Input<PullUp>>,
 }
 
 impl Buttons {
