@@ -1,26 +1,34 @@
-#![feature(in_band_lifetimes)]
 #![no_std]
 #![no_main]
+#![recursion_limit = "1024"]
+#![cfg_attr(debug_assertions, allow(unused_imports))]
+#[allow(arithmetic_overflow)]
+#[allow(overflowing_literals)]
 
-mod cpu;
+use panic_halt as _;
+
+// mod cpu;
+// mod cart;
 mod io;
+// mod mmu;
 
-// This import is very much used to indicate a panic handler
-#[allow(unused_imports)]
-use panic_halt;
 
-use itsybitsy_m4::clock::GenericClockController;
-use itsybitsy_m4::delay::Delay;
-use itsybitsy_m4::entry;
-use itsybitsy_m4::pac::{CorePeripherals, Peripherals};
-use itsybitsy_m4::prelude::*;
-use itsybitsy_m4::watchdog::{Watchdog, WatchdogTimeout};
+use itsybitsy_m4 as bsp;
+use bsp::hal;
 
-use io::*;
+use bsp::entry;
+use hal::clock::GenericClockController;
+use hal::delay::Delay;
+use hal::pac::{CorePeripherals, Peripherals};
+use hal::prelude::*;
+use hal::watchdog::{Watchdog, WatchdogTimeout};
+// use hal::gpio::v2::Pins;
+
+use io::hid;
+use crate::io::hid::{Buttons, Pressed};
 
 #[entry]
 fn main() -> ! {
-    // Example blinky_led
     let core = CorePeripherals::take().unwrap();
     let mut peripherals = Peripherals::take().unwrap();
     let mut clocks = GenericClockController::with_internal_32kosc(
@@ -33,42 +41,30 @@ fn main() -> ! {
     let mut delay = Delay::new(core.SYST, &mut clocks);
     delay.delay_ms(400u16);
 
-    let wdt = Watchdog::new(peripherals.WDT);
-    let pins = itsybitsy_m4::Pins::new(peripherals.PORT);
-
-    event_loop(pins, wdt, delay)
-}
-
-fn event_loop(mut pins: itsybitsy_m4::Pins, mut wdt: Watchdog, _delay: Delay) -> ! {
+    let mut pins = bsp::Pins::new(peripherals.PORT);
+    // let mut red_led = pins.d13.into_push_pull_output();
+    let mut wdt = Watchdog::new(peripherals.WDT);
     wdt.start(WatchdogTimeout::Cycles256 as u8);
 
-    let cpu = unsafe { cpu::CPU::new() };
     // Turns off the indicator until we need it
-    let mut _indicator = pins.d13.into_open_drain_output(&mut pins.port);
+    let mut _indicator = pins.d13.into_push_pull_output();
 
-    let buttons = hid::Buttons {
-        a: pins.i2c_scl.into_pull_up_input(&mut pins.port),
-        b: pins.d7.into_pull_up_input(&mut pins.port),
-        up: pins.d10.into_pull_up_input(&mut pins.port),
-        down: pins.d12.into_pull_up_input(&mut pins.port),
-        left: pins.d11.into_pull_up_input(&mut pins.port),
-        right: pins.d9.into_pull_up_input(&mut pins.port),
-        menu: pins.i2c_sda.into_pull_up_input(&mut pins.port),
+    let btns = Buttons {
+        a: pins.scl.into_pull_up_input(),
+        b: pins.d7.into_pull_up_input(),
+        up: pins.d10.into_pull_up_input(),
+        down: pins.d12.into_pull_up_input(),
+        left: pins.d11.into_pull_up_input(),
+        right: pins.d9.into_pull_up_input(),
+        menu: pins.sda.into_pull_up_input(),
     };
 
     loop {
-        // You can verify this works by doing something akin to
-        // hid::Pressed::Up => _indicator.set_high().unwrap(),
-        match buttons.pressed() {
-            hid::Pressed::Up => {}
-            hid::Pressed::Down => {}
-            hid::Pressed::Left => {}
-            hid::Pressed::Right => {}
-            hid::Pressed::None => {}
-            hid::Pressed::A => {}
-            hid::Pressed::B => {}
-            hid::Pressed::Menu => {}
-        }
+        delay.delay_ms(7u8);
+        _ = match btns.pressed() {
+            Pressed::None => _indicator.set_low(),
+            _ => _indicator.set_high()
+        };
         wdt.feed();
     }
 }
